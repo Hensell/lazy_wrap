@@ -1,5 +1,5 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:lazy_wrap/src/utils/row_builder.dart';
 import 'measure_size.dart';
 
 class LazyWrap extends StatefulWidget {
@@ -8,10 +8,8 @@ class LazyWrap extends StatefulWidget {
   final double spacing;
   final double runSpacing;
   final EdgeInsetsGeometry padding;
-  final ScrollPhysics? physics;
-  final ScrollController? controller;
-  final bool shrinkWrap;
-  final MainAxisAlignment rowAlignment;
+  final double estimatedItemWidth;
+  final double estimatedItemHeight;
 
   const LazyWrap({
     super.key,
@@ -20,10 +18,8 @@ class LazyWrap extends StatefulWidget {
     this.spacing = 8,
     this.runSpacing = 8,
     this.padding = EdgeInsets.zero,
-    this.physics,
-    this.controller,
-    this.shrinkWrap = false,
-    this.rowAlignment = MainAxisAlignment.start,
+    this.estimatedItemWidth = 120,
+    this.estimatedItemHeight = 100,
   });
 
   @override
@@ -31,74 +27,141 @@ class LazyWrap extends StatefulWidget {
 }
 
 class _LazyWrapState extends State<LazyWrap> {
-  final _itemWidths = <int, double>{};
+  final ScrollController _scrollController = ScrollController();
+  final Map<int, Size> _itemSizes = {};
+  final Map<int, double> _rowHeights = {};
+  double _viewportHeight = 0;
+  double _scrollOffset = 0;
+  bool _scheduledUpdate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      setState(() {
+        _scrollOffset = _scrollController.offset;
+      });
+    });
+  }
+
+  void _scheduleRebuild() {
+    if (_scheduledUpdate) return;
+    _scheduledUpdate = true;
+    Future.microtask(() {
+      if (mounted) {
+        setState(() {
+          _scheduledUpdate = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
-      builder: (context, constraints) {
-        final effectiveWidth = constraints.maxWidth - widget.padding.horizontal;
-        final rowGroups = <List<int>>[];
-        int current = 0;
+      builder: (_, constraints) {
+        _viewportHeight = constraints.maxHeight;
+        final width = constraints.maxWidth - widget.padding.horizontal;
 
-        while (current < widget.itemCount) {
-          final row = <int>[];
+        final itemsPerRow =
+            (width / (widget.estimatedItemWidth + widget.spacing))
+                .floor()
+                .clamp(1, widget.itemCount);
+        final rowCount = (widget.itemCount / itemsPerRow).ceil();
 
-          final rowGroups = buildRowGroups(
-            itemCount: widget.itemCount,
-            maxWidth: effectiveWidth,
-            spacing: widget.spacing,
-            itemWidths: _itemWidths,
-          );
+        final defaultRowHeight = widget.estimatedItemHeight + widget.runSpacing;
 
-          if (row.isEmpty) {
-            row.add(current);
-            current++;
-          }
+        double totalHeight = 0;
+        final List<double> rowOffsets = List.filled(rowCount, 0);
 
-          rowGroups.add(row);
+        for (int i = 0; i < rowCount; i++) {
+          final rowHeight = _rowHeights[i] ?? defaultRowHeight;
+          rowOffsets[i] = totalHeight;
+          totalHeight += rowHeight + widget.runSpacing;
         }
 
-        return ListView.builder(
-          padding: widget.padding,
-          physics: widget.physics,
-          controller: widget.controller,
-          shrinkWrap: widget.shrinkWrap,
-          itemCount: rowGroups.length,
-          itemBuilder: (context, rowIndex) {
-            final row = rowGroups[rowIndex];
-            final children = <Widget>[];
+        int firstVisibleRow = 0;
+        for (int i = 0; i < rowCount; i++) {
+          if (rowOffsets[i] + (_rowHeights[i] ?? defaultRowHeight) >=
+              _scrollOffset) {
+            firstVisibleRow = i;
+            break;
+          }
+        }
 
-            for (int i = 0; i < row.length; i++) {
-              final index = row[i];
-              final isLast = i == row.length - 1;
+        const rowBuffer = 2;
+        final visibleRowCount =
+            (_viewportHeight / defaultRowHeight).ceil() + rowBuffer;
+        final startRow = (firstVisibleRow - rowBuffer).clamp(0, rowCount);
+        final endRow = (firstVisibleRow + visibleRowCount).clamp(0, rowCount);
 
-              children.add(
-                Padding(
-                  padding: EdgeInsets.only(right: isLast ? 0 : widget.spacing),
-                  child: MeasureSize(
-                    onChange: (size) {
-                      if (size != null && size.width != _itemWidths[index]) {
-                        setState(() => _itemWidths[index] = size.width);
-                      }
-                    },
-                    child: widget.itemBuilder(context, index),
-                  ),
-                ),
-              );
+        final rows = <Widget>[];
+
+        for (int rowIndex = startRow; rowIndex < endRow; rowIndex++) {
+          final startIndex = rowIndex * itemsPerRow;
+          final endIndex =
+              (startIndex + itemsPerRow).clamp(0, widget.itemCount);
+
+          double rowHeight = 0;
+          final children = <Widget>[];
+
+          for (int i = startIndex; i < endIndex; i++) {
+            final size = _itemSizes[i];
+            if (size != null) {
+              rowHeight = max(rowHeight, size.height);
             }
 
-            return Padding(
-              padding: EdgeInsets.only(bottom: widget.runSpacing),
-              child: SizedBox(
-                width: effectiveWidth,
-                child: Row(
-                  mainAxisAlignment: widget.rowAlignment,
-                  children: children,
+            children.add(
+              Padding(
+                padding: EdgeInsets.only(
+                    right: i == endIndex - 1 ? 0 : widget.spacing),
+                child: MeasureSize(
+                  onChange: (size) {
+                    if (_itemSizes[i] != size) {
+                      _itemSizes[i] = size;
+                      _scheduleRebuild();
+                    }
+                  },
+                  child: widget.itemBuilder(context, i),
                 ),
               ),
             );
-          },
+          }
+
+          if (rowHeight == 0) {
+            rowHeight = widget.estimatedItemHeight;
+          }
+
+          if (_rowHeights[rowIndex] != rowHeight) {
+            _rowHeights[rowIndex] = rowHeight;
+          }
+
+          final topOffset = rowOffsets[rowIndex];
+
+          rows.add(
+            Positioned(
+              top: topOffset,
+              left: widget.padding.resolve(TextDirection.ltr).left,
+              child: RepaintBoundary(
+                child: Row(children: children),
+              ),
+            ),
+          );
+        }
+
+        return SingleChildScrollView(
+          controller: _scrollController,
+          padding: widget.padding,
+          child: SizedBox(
+            height: totalHeight,
+            child: Stack(children: rows),
+          ),
         );
       },
     );

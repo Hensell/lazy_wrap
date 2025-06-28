@@ -10,3 +10,6 @@
 
 ## 0.0.4
 - Bug fixed.
+
+## 0.0.5
+- Bug fixed.

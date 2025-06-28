@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
-typedef OnWidgetSizeChange = void Function(Size? size);
+typedef OnWidgetSizeChange = void Function(Size size);
 
 class MeasureSize extends StatefulWidget {
   final Widget child;
@@ -8,8 +8,8 @@ class MeasureSize extends StatefulWidget {
 
   const MeasureSize({
     super.key,
-    required this.onChange,
     required this.child,
+    required this.onChange,
   });
 
   @override
@@ -17,23 +17,37 @@ class MeasureSize extends StatefulWidget {
 }
 
 class _MeasureSizeState extends State<MeasureSize> {
-  final _key = GlobalKey();
   Size? oldSize;
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) => _notifySize());
-    return Container(key: _key, child: widget.child);
+    return NotificationListener<SizeChangedLayoutNotification>(
+      onNotification: (_) {
+        if (mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _notifySize());
+        }
+        return true;
+      },
+      child: SizeChangedLayoutNotifier(
+        child: LayoutBuilder(
+          builder: (_, __) {
+            if (mounted) {
+              WidgetsBinding.instance
+                  .addPostFrameCallback((_) => _notifySize());
+            }
+            return widget.child;
+          },
+        ),
+      ),
+    );
   }
 
   void _notifySize() {
-    final context = _key.currentContext;
-    if (context == null) return;
-
-    final newSize = context.size;
-    if (oldSize == newSize) return;
-
-    oldSize = newSize;
-    widget.onChange(newSize);
+    if (!mounted) return;
+    final contextSize = context.size;
+    if (contextSize != null && contextSize != oldSize) {
+      oldSize = contextSize;
+      widget.onChange(contextSize);
+    }
   }
 }
