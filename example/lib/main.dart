@@ -24,7 +24,6 @@ class LazyWrapDemoApp extends StatelessWidget {
               ),
             );
           },
-          itemWidth: 120,
           spacing: 12,
           runSpacing: 12,
           padding: const EdgeInsets.all(16),

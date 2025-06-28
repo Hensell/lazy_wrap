@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:lazy_wrap/src/utils/row_builder.dart';
+import 'measure_size.dart';
 
-class LazyWrap extends StatelessWidget {
+class LazyWrap extends StatefulWidget {
   final int itemCount;
   final Widget Function(BuildContext, int) itemBuilder;
   final double spacing;
   final double runSpacing;
-  final double itemWidth;
   final EdgeInsetsGeometry padding;
   final ScrollPhysics? physics;
   final ScrollController? controller;
@@ -18,7 +19,6 @@ class LazyWrap extends StatelessWidget {
     required this.itemBuilder,
     this.spacing = 8,
     this.runSpacing = 8,
-    this.itemWidth = 160,
     this.padding = EdgeInsets.zero,
     this.physics,
     this.controller,
@@ -27,50 +27,73 @@ class LazyWrap extends StatelessWidget {
   });
 
   @override
+  State<LazyWrap> createState() => _LazyWrapState();
+}
+
+class _LazyWrapState extends State<LazyWrap> {
+  final _itemWidths = <int, double>{};
+
+  @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final effectiveWidth = constraints.maxWidth - padding.horizontal;
-        final crossAxisCount =
-            ((effectiveWidth + spacing) / (itemWidth + spacing))
-                .floor()
-                .clamp(1, itemCount);
+        final effectiveWidth = constraints.maxWidth - widget.padding.horizontal;
+        final rowGroups = <List<int>>[];
+        int current = 0;
+
+        while (current < widget.itemCount) {
+          final row = <int>[];
+
+          final rowGroups = buildRowGroups(
+            itemCount: widget.itemCount,
+            maxWidth: effectiveWidth,
+            spacing: widget.spacing,
+            itemWidths: _itemWidths,
+          );
+
+          if (row.isEmpty) {
+            row.add(current);
+            current++;
+          }
+
+          rowGroups.add(row);
+        }
 
         return ListView.builder(
-          padding: padding,
-          physics: physics,
-          controller: controller,
-          shrinkWrap: shrinkWrap,
-          itemCount: (itemCount / crossAxisCount).ceil(),
+          padding: widget.padding,
+          physics: widget.physics,
+          controller: widget.controller,
+          shrinkWrap: widget.shrinkWrap,
+          itemCount: rowGroups.length,
           itemBuilder: (context, rowIndex) {
+            final row = rowGroups[rowIndex];
             final children = <Widget>[];
-            final startIndex = rowIndex * crossAxisCount;
-            final endIndex = (startIndex + crossAxisCount).clamp(0, itemCount);
 
-            final totalSpacing = spacing * (crossAxisCount - 1);
-            final usableWidth = effectiveWidth - totalSpacing;
-            final adjustedItemWidth = usableWidth / crossAxisCount;
+            for (int i = 0; i < row.length; i++) {
+              final index = row[i];
+              final isLast = i == row.length - 1;
 
-            for (int i = startIndex; i < endIndex; i++) {
               children.add(
                 Padding(
-                  padding: EdgeInsets.only(
-                    right: i < endIndex - 1 ? spacing : 0,
-                  ),
-                  child: SizedBox(
-                    width: adjustedItemWidth,
-                    child: itemBuilder(context, i),
+                  padding: EdgeInsets.only(right: isLast ? 0 : widget.spacing),
+                  child: MeasureSize(
+                    onChange: (size) {
+                      if (size != null && size.width != _itemWidths[index]) {
+                        setState(() => _itemWidths[index] = size.width);
+                      }
+                    },
+                    child: widget.itemBuilder(context, index),
                   ),
                 ),
               );
             }
 
             return Padding(
-              padding: EdgeInsets.only(bottom: runSpacing),
+              padding: EdgeInsets.only(bottom: widget.runSpacing),
               child: SizedBox(
                 width: effectiveWidth,
                 child: Row(
-                  mainAxisAlignment: rowAlignment,
+                  mainAxisAlignment: widget.rowAlignment,
                   children: children,
                 ),
               ),
