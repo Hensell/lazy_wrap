@@ -13,3 +13,6 @@
 
 ## 0.0.5
 - Bug fixed.
+
+## 0.0.6
+- Performance improve
