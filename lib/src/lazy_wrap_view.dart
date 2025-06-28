@@ -30,7 +30,8 @@ class LazyWrap extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = (constraints.maxWidth / (itemWidth + spacing))
+        final totalWidth = constraints.maxWidth;
+        final crossAxisCount = ((totalWidth + spacing) / (itemWidth + spacing))
             .floor()
             .clamp(1, itemCount);
         return ListView.builder(
