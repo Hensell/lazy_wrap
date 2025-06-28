@@ -23,18 +23,13 @@ class _MeasureSizeState extends State<MeasureSize> {
   Widget build(BuildContext context) {
     return NotificationListener<SizeChangedLayoutNotification>(
       onNotification: (_) {
-        if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _notifySize());
-        }
+        WidgetsBinding.instance.addPostFrameCallback((_) => _notifySize());
         return true;
       },
       child: SizeChangedLayoutNotifier(
         child: LayoutBuilder(
           builder: (_, __) {
-            if (mounted) {
-              WidgetsBinding.instance
-                  .addPostFrameCallback((_) => _notifySize());
-            }
+            WidgetsBinding.instance.addPostFrameCallback((_) => _notifySize());
             return widget.child;
           },
         ),
@@ -43,7 +38,6 @@ class _MeasureSizeState extends State<MeasureSize> {
   }
 
   void _notifySize() {
-    if (!mounted) return;
     final contextSize = context.size;
     if (contextSize != null && contextSize != oldSize) {
       oldSize = contextSize;

@@ -29,10 +29,10 @@ class LazyWrap extends StatefulWidget {
 class _LazyWrapState extends State<LazyWrap> {
   final ScrollController _scrollController = ScrollController();
   final Map<int, Size> _itemSizes = {};
-  final Map<int, double> _rowHeights = {};
-  double _viewportHeight = 0;
+  final Map<int, ValueNotifier<List<_LazyItemMeta>>> _rows = {};
+
   double _scrollOffset = 0;
-  bool _scheduledUpdate = false;
+  double _viewportHeight = 0;
 
   @override
   void initState() {
@@ -41,18 +41,6 @@ class _LazyWrapState extends State<LazyWrap> {
       setState(() {
         _scrollOffset = _scrollController.offset;
       });
-    });
-  }
-
-  void _scheduleRebuild() {
-    if (_scheduledUpdate) return;
-    _scheduledUpdate = true;
-    Future.microtask(() {
-      if (mounted) {
-        setState(() {
-          _scheduledUpdate = false;
-        });
-      }
     });
   }
 
@@ -66,104 +54,151 @@ class _LazyWrapState extends State<LazyWrap> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (_, constraints) {
+        final availableWidth = constraints.maxWidth - widget.padding.horizontal;
         _viewportHeight = constraints.maxHeight;
-        final width = constraints.maxWidth - widget.padding.horizontal;
 
-        final itemsPerRow =
-            (width / (widget.estimatedItemWidth + widget.spacing))
-                .floor()
-                .clamp(1, widget.itemCount);
-        final rowCount = (widget.itemCount / itemsPerRow).ceil();
+        final List<Widget> visibleRows = [];
+        final Set<int> visibleRowIndices = {};
+        double yOffset = 0;
+        double rowHeight = 0;
+        double xOffset = 0;
 
-        final defaultRowHeight = widget.estimatedItemHeight + widget.runSpacing;
+        int rowIndex = 0;
+        int currentIndex = 0;
+        const buffer = 500.0;
+        const extraBreakPadding = 17.0;
 
-        double totalHeight = 0;
-        final List<double> rowOffsets = List.filled(rowCount, 0);
+        // 🔥 Estimación de salto al scroll Y
+        final estRowHeight = widget.estimatedItemHeight + widget.runSpacing;
+        final estStartY = max(0, _scrollOffset - buffer);
+        final estStartRow = (estStartY / estRowHeight).floor();
 
-        for (int i = 0; i < rowCount; i++) {
-          final rowHeight = _rowHeights[i] ?? defaultRowHeight;
-          rowOffsets[i] = totalHeight;
-          totalHeight += rowHeight + widget.runSpacing;
-        }
+        // Saltamos a la fila estimada
+        while (rowIndex < estStartRow && currentIndex < widget.itemCount) {
+          xOffset = 0;
 
-        int firstVisibleRow = 0;
-        for (int i = 0; i < rowCount; i++) {
-          if (rowOffsets[i] + (_rowHeights[i] ?? defaultRowHeight) >=
-              _scrollOffset) {
-            firstVisibleRow = i;
-            break;
-          }
-        }
+          while (currentIndex < widget.itemCount) {
+            final size = _itemSizes[currentIndex] ??
+                Size(widget.estimatedItemWidth, widget.estimatedItemHeight);
 
-        const rowBuffer = 2;
-        final visibleRowCount =
-            (_viewportHeight / defaultRowHeight).ceil() + rowBuffer;
-        final startRow = (firstVisibleRow - rowBuffer).clamp(0, rowCount);
-        final endRow = (firstVisibleRow + visibleRowCount).clamp(0, rowCount);
-
-        final rows = <Widget>[];
-
-        for (int rowIndex = startRow; rowIndex < endRow; rowIndex++) {
-          final startIndex = rowIndex * itemsPerRow;
-          final endIndex =
-              (startIndex + itemsPerRow).clamp(0, widget.itemCount);
-
-          double rowHeight = 0;
-          final children = <Widget>[];
-
-          for (int i = startIndex; i < endIndex; i++) {
-            final size = _itemSizes[i];
-            if (size != null) {
-              rowHeight = max(rowHeight, size.height);
+            if (xOffset + size.width > availableWidth - extraBreakPadding &&
+                xOffset > 0) {
+              break;
             }
 
-            children.add(
-              Padding(
-                padding: EdgeInsets.only(
-                    right: i == endIndex - 1 ? 0 : widget.spacing),
-                child: MeasureSize(
-                  onChange: (size) {
-                    if (_itemSizes[i] != size) {
-                      _itemSizes[i] = size;
-                      _scheduleRebuild();
-                    }
-                  },
-                  child: widget.itemBuilder(context, i),
-                ),
+            xOffset += size.width + widget.spacing;
+            currentIndex++;
+          }
+
+          yOffset += estRowHeight;
+          rowIndex++;
+        }
+
+        // Ahora renderizamos solo lo visible desde estRow
+        while (currentIndex < widget.itemCount) {
+          final rowItems = <_LazyItemMeta>[];
+
+          xOffset = 0;
+          rowHeight = 0;
+
+          while (currentIndex < widget.itemCount) {
+            final size = _itemSizes[currentIndex] ??
+                Size(widget.estimatedItemWidth, widget.estimatedItemHeight);
+
+            if (xOffset + size.width > availableWidth - extraBreakPadding &&
+                xOffset > 0) {
+              break;
+            }
+
+            rowItems.add(
+              _LazyItemMeta(
+                index: currentIndex,
+                offset: xOffset,
+                size: size,
               ),
             );
+
+            xOffset += size.width + widget.spacing;
+            rowHeight = max(rowHeight, size.height);
+            currentIndex++;
           }
 
-          if (rowHeight == 0) {
-            rowHeight = widget.estimatedItemHeight;
-          }
+          final rowTop = yOffset;
+          final rowBottom = yOffset + rowHeight;
 
-          if (_rowHeights[rowIndex] != rowHeight) {
-            _rowHeights[rowIndex] = rowHeight;
-          }
+          final shouldRender = rowBottom >= _scrollOffset - buffer &&
+              rowTop <= _scrollOffset + _viewportHeight + buffer;
 
-          final topOffset = rowOffsets[rowIndex];
+          if (shouldRender) {
+            visibleRowIndices.add(rowIndex);
 
-          rows.add(
-            Positioned(
-              top: topOffset,
+            final rowNotifier = _rows.putIfAbsent(
+              rowIndex,
+              () => ValueNotifier(rowItems),
+            );
+            rowNotifier.value = rowItems;
+
+            visibleRows.add(Positioned(
+              top: rowTop,
               left: widget.padding.resolve(TextDirection.ltr).left,
               child: RepaintBoundary(
-                child: Row(children: children),
+                child: AnimatedBuilder(
+                  animation: rowNotifier,
+                  builder: (_, __) {
+                    return Row(
+                      children: rowNotifier.value.map((meta) {
+                        return Padding(
+                          padding: EdgeInsets.only(right: widget.spacing),
+                          child: MeasureSize(
+                            onChange: (measured) {
+                              if (_itemSizes[meta.index] != measured) {
+                                _itemSizes[meta.index] = measured;
+                                rowNotifier.value =
+                                    List.from(rowNotifier.value);
+                              }
+                            },
+                            child: widget.itemBuilder(context, meta.index),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
               ),
-            ),
-          );
+            ));
+          }
+
+          yOffset += rowHeight + widget.runSpacing;
+          rowIndex++;
+
+          // Seguridad: si ya pasamos viewport + buffer, cortamos el loop
+          if (yOffset > _scrollOffset + _viewportHeight + buffer) break;
         }
+
+        // 🔁 Limpieza
+        _rows.removeWhere((key, _) => !visibleRowIndices.contains(key));
 
         return SingleChildScrollView(
           controller: _scrollController,
           padding: widget.padding,
           child: SizedBox(
-            height: totalHeight,
-            child: Stack(children: rows),
+            height: yOffset,
+            child: Stack(children: visibleRows),
           ),
         );
       },
     );
   }
+}
+
+class _LazyItemMeta {
+  final int index;
+  final double offset;
+  final Size size;
+
+  _LazyItemMeta({
+    required this.index,
+    required this.offset,
+    required this.size,
+  });
 }
