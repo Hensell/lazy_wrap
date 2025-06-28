@@ -15,7 +15,7 @@ class LazyWrapDemoApp extends StatelessWidget {
       home: Scaffold(
         appBar: AppBar(title: const Text('LazyWrap Demo')),
         body: LazyWrap(
-          itemCount: 50,
+          itemCount: 10000,
           itemBuilder: (context, index) {
             return Card(
               child: Padding(

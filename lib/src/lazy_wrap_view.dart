@@ -10,6 +10,7 @@ class LazyWrap extends StatelessWidget {
   final ScrollPhysics? physics;
   final ScrollController? controller;
   final bool shrinkWrap;
+  final MainAxisAlignment rowAlignment;
 
   const LazyWrap({
     super.key,
@@ -22,6 +23,7 @@ class LazyWrap extends StatelessWidget {
     this.physics,
     this.controller,
     this.shrinkWrap = false,
+    this.rowAlignment = MainAxisAlignment.start,
   });
 
   @override
@@ -58,7 +60,10 @@ class LazyWrap extends StatelessWidget {
 
             return Padding(
               padding: EdgeInsets.only(bottom: runSpacing),
-              child: Row(children: children),
+              child: Row(
+                mainAxisAlignment: rowAlignment, // ← importante
+                children: children,
+              ),
             );
           },
         );
