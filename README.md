@@ -13,6 +13,7 @@ LazyWrap(
   itemWidth: 120,
   spacing: 8,
   runSpacing: 8,
+  rowAlignment: MainAxisAlignment.center,
 )
 ```
 
@@ -30,5 +31,5 @@ Add it to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  lazy_wrap: ^0.0.1
+  lazy_wrap: ^0.0.2
 ```
