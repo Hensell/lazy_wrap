@@ -16,3 +16,6 @@
 
 ## 0.0.6
 - Performance improve
+
+## 0.0.7
+- Added fixed mode

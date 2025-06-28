@@ -10,6 +10,7 @@ class LazyWrap extends StatefulWidget {
   final EdgeInsetsGeometry padding;
   final double estimatedItemWidth;
   final double estimatedItemHeight;
+  final bool useDynamicMeasurement;
 
   const LazyWrap({
     super.key,
@@ -20,6 +21,7 @@ class LazyWrap extends StatefulWidget {
     this.padding = EdgeInsets.zero,
     this.estimatedItemWidth = 120,
     this.estimatedItemHeight = 100,
+    this.useDynamicMeasurement = true, // 🔥 nuevo parámetro
   });
 
   @override
@@ -68,18 +70,15 @@ class _LazyWrapState extends State<LazyWrap> {
         const buffer = 500.0;
         const extraBreakPadding = 17.0;
 
-        // 🔥 Estimación de salto al scroll Y
         final estRowHeight = widget.estimatedItemHeight + widget.runSpacing;
         final estStartY = max(0, _scrollOffset - buffer);
         final estStartRow = (estStartY / estRowHeight).floor();
 
-        // Saltamos a la fila estimada
         while (rowIndex < estStartRow && currentIndex < widget.itemCount) {
           xOffset = 0;
 
           while (currentIndex < widget.itemCount) {
-            final size = _itemSizes[currentIndex] ??
-                Size(widget.estimatedItemWidth, widget.estimatedItemHeight);
+            final size = _getSize(currentIndex);
 
             if (xOffset + size.width > availableWidth - extraBreakPadding &&
                 xOffset > 0) {
@@ -94,16 +93,13 @@ class _LazyWrapState extends State<LazyWrap> {
           rowIndex++;
         }
 
-        // Ahora renderizamos solo lo visible desde estRow
         while (currentIndex < widget.itemCount) {
           final rowItems = <_LazyItemMeta>[];
-
           xOffset = 0;
           rowHeight = 0;
 
           while (currentIndex < widget.itemCount) {
-            final size = _itemSizes[currentIndex] ??
-                Size(widget.estimatedItemWidth, widget.estimatedItemHeight);
+            final size = _getSize(currentIndex);
 
             if (xOffset + size.width > availableWidth - extraBreakPadding &&
                 xOffset > 0) {
@@ -147,6 +143,19 @@ class _LazyWrapState extends State<LazyWrap> {
                   builder: (_, __) {
                     return Row(
                       children: rowNotifier.value.map((meta) {
+                        final child = widget.itemBuilder(context, meta.index);
+
+                        if (!widget.useDynamicMeasurement) {
+                          return Padding(
+                            padding: EdgeInsets.only(right: widget.spacing),
+                            child: SizedBox(
+                              width: widget.estimatedItemWidth,
+                              height: widget.estimatedItemHeight,
+                              child: child,
+                            ),
+                          );
+                        }
+
                         return Padding(
                           padding: EdgeInsets.only(right: widget.spacing),
                           child: MeasureSize(
@@ -157,7 +166,7 @@ class _LazyWrapState extends State<LazyWrap> {
                                     List.from(rowNotifier.value);
                               }
                             },
-                            child: widget.itemBuilder(context, meta.index),
+                            child: child,
                           ),
                         );
                       }).toList(),
@@ -171,11 +180,9 @@ class _LazyWrapState extends State<LazyWrap> {
           yOffset += rowHeight + widget.runSpacing;
           rowIndex++;
 
-          // Seguridad: si ya pasamos viewport + buffer, cortamos el loop
           if (yOffset > _scrollOffset + _viewportHeight + buffer) break;
         }
 
-        // 🔁 Limpieza
         _rows.removeWhere((key, _) => !visibleRowIndices.contains(key));
 
         return SingleChildScrollView(
@@ -188,6 +195,13 @@ class _LazyWrapState extends State<LazyWrap> {
         );
       },
     );
+  }
+
+  Size _getSize(int index) {
+    return widget.useDynamicMeasurement
+        ? _itemSizes[index] ??
+            Size(widget.estimatedItemWidth, widget.estimatedItemHeight)
+        : Size(widget.estimatedItemWidth, widget.estimatedItemHeight);
   }
 }
 
