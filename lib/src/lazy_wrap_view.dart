@@ -30,10 +30,12 @@ class LazyWrap extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final totalWidth = constraints.maxWidth;
-        final crossAxisCount = ((totalWidth + spacing) / (itemWidth + spacing))
-            .floor()
-            .clamp(1, itemCount);
+        final effectiveWidth = constraints.maxWidth - padding.horizontal;
+        final crossAxisCount =
+            ((effectiveWidth + spacing) / (itemWidth + spacing))
+                .floor()
+                .clamp(1, itemCount);
+
         return ListView.builder(
           padding: padding,
           physics: physics,
@@ -45,6 +47,10 @@ class LazyWrap extends StatelessWidget {
             final startIndex = rowIndex * crossAxisCount;
             final endIndex = (startIndex + crossAxisCount).clamp(0, itemCount);
 
+            final totalSpacing = spacing * (crossAxisCount - 1);
+            final usableWidth = effectiveWidth - totalSpacing;
+            final adjustedItemWidth = usableWidth / crossAxisCount;
+
             for (int i = startIndex; i < endIndex; i++) {
               children.add(
                 Padding(
@@ -52,7 +58,7 @@ class LazyWrap extends StatelessWidget {
                     right: i < endIndex - 1 ? spacing : 0,
                   ),
                   child: SizedBox(
-                    width: itemWidth,
+                    width: adjustedItemWidth,
                     child: itemBuilder(context, i),
                   ),
                 ),
@@ -61,9 +67,12 @@ class LazyWrap extends StatelessWidget {
 
             return Padding(
               padding: EdgeInsets.only(bottom: runSpacing),
-              child: Row(
-                mainAxisAlignment: rowAlignment, // ← importante
-                children: children,
+              child: SizedBox(
+                width: effectiveWidth,
+                child: Row(
+                  mainAxisAlignment: rowAlignment,
+                  children: children,
+                ),
               ),
             );
           },
