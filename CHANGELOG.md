@@ -33,3 +33,6 @@
 
 ## [0.0.8+3] 
 - Added live demo.
+
+## [0.0.8+4] 
+- Update default values.

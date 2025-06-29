@@ -20,9 +20,9 @@ class LazyWrap extends StatefulWidget {
     this.spacing = 8,
     this.runSpacing = 8,
     this.padding = EdgeInsets.zero,
-    this.estimatedItemWidth = 120,
-    this.estimatedItemHeight = 100,
-    this.useDynamicMeasurement = true,
+    this.estimatedItemWidth = 320,
+    this.estimatedItemHeight = 300,
+    this.useDynamicMeasurement = false,
     this.rowAlignment = MainAxisAlignment.start,
   });
 
