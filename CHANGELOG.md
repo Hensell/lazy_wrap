@@ -19,3 +19,6 @@
 
 ## 0.0.7
 - Added fixed mode
+
+## 0.0.8
+- Added `rowAlignment` to allow horizontal alignment of children inside each row (e.g. center).
