@@ -22,3 +22,12 @@
 
 ## 0.0.8
 - Added `rowAlignment` to allow horizontal alignment of children inside each row (e.g. center).
+
+## [0.0.8+1] 
+### Fixed
+- Fixed row alignment issue that caused overflow when using `MainAxisAlignment.center`.
+- Wrapped `Row` in `SizedBox` with calculated width to prevent layout overflow.
+
+## [0.0.8+2] 
+- Bug fixed.
+

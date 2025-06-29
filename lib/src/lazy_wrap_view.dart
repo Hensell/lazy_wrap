@@ -11,7 +11,7 @@ class LazyWrap extends StatefulWidget {
   final double estimatedItemWidth;
   final double estimatedItemHeight;
   final bool useDynamicMeasurement;
-  final MainAxisAlignment rowAlignment; // ✅ NUEVO
+  final MainAxisAlignment rowAlignment;
 
   const LazyWrap({
     super.key,
@@ -23,7 +23,7 @@ class LazyWrap extends StatefulWidget {
     this.estimatedItemWidth = 120,
     this.estimatedItemHeight = 100,
     this.useDynamicMeasurement = true,
-    this.rowAlignment = MainAxisAlignment.start, // ✅ DEFAULT
+    this.rowAlignment = MainAxisAlignment.start,
   });
 
   @override
@@ -76,7 +76,6 @@ class _LazyWrapState extends State<LazyWrap> {
         final estStartY = max(0, _scrollOffset - buffer);
         final estStartRow = (estStartY / estRowHeight).floor();
 
-        // ⬅️ SKIP hasta llegar al primer renderizable
         while (rowIndex < estStartRow && currentIndex < widget.itemCount) {
           xOffset = 0;
 
@@ -96,7 +95,6 @@ class _LazyWrapState extends State<LazyWrap> {
           rowIndex++;
         }
 
-        // ⬇️ VISIBLES
         while (currentIndex < widget.itemCount) {
           final rowItems = <_LazyItemMeta>[];
           xOffset = 0;
@@ -141,41 +139,44 @@ class _LazyWrapState extends State<LazyWrap> {
             visibleRows.add(Positioned(
               top: rowTop,
               left: widget.padding.resolve(TextDirection.ltr).left,
-              right: widget.padding.resolve(TextDirection.ltr).right,
               child: RepaintBoundary(
                 child: AnimatedBuilder(
                   animation: rowNotifier,
                   builder: (_, __) {
-                    return Row(
-                      mainAxisAlignment: widget.rowAlignment, // ✅ AHÍ VA
-                      children: rowNotifier.value.map((meta) {
-                        final child = widget.itemBuilder(context, meta.index);
+                    return SizedBox(
+                      width:
+                          availableWidth, // ✅ ancho fijo para centrado sin overflow
+                      child: Row(
+                        mainAxisAlignment: widget.rowAlignment,
+                        children: rowNotifier.value.map((meta) {
+                          final child = widget.itemBuilder(context, meta.index);
 
-                        if (!widget.useDynamicMeasurement) {
+                          if (!widget.useDynamicMeasurement) {
+                            return Padding(
+                              padding: EdgeInsets.only(right: widget.spacing),
+                              child: SizedBox(
+                                width: widget.estimatedItemWidth,
+                                height: widget.estimatedItemHeight,
+                                child: child,
+                              ),
+                            );
+                          }
+
                           return Padding(
                             padding: EdgeInsets.only(right: widget.spacing),
-                            child: SizedBox(
-                              width: widget.estimatedItemWidth,
-                              height: widget.estimatedItemHeight,
+                            child: MeasureSize(
+                              onChange: (measured) {
+                                if (_itemSizes[meta.index] != measured) {
+                                  _itemSizes[meta.index] = measured;
+                                  rowNotifier.value =
+                                      List.from(rowNotifier.value);
+                                }
+                              },
                               child: child,
                             ),
                           );
-                        }
-
-                        return Padding(
-                          padding: EdgeInsets.only(right: widget.spacing),
-                          child: MeasureSize(
-                            onChange: (measured) {
-                              if (_itemSizes[meta.index] != measured) {
-                                _itemSizes[meta.index] = measured;
-                                rowNotifier.value =
-                                    List.from(rowNotifier.value);
-                              }
-                            },
-                            child: child,
-                          ),
-                        );
-                      }).toList(),
+                        }).toList(),
+                      ),
                     );
                   },
                 ),
