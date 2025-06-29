@@ -31,24 +31,6 @@ LazyWrap(
 - Switch toggle for dynamic/fixed mode
 - Clean animation and styling ready
 
-## 🧪 Interactive Features
-
-Easily integrate runtime controls like:
-
-```dart
-Slider(
-  min: 0,
-  max: 50,
-  value: borderRadiusValue,
-  onChanged: (val) => setState(() => borderRadiusValue = val),
-);
-
-Switch(
-  value: !useDynamicMeasurement,
-  onChanged: (val) => setState(() => useDynamicMeasurement = !val),
-);
-```
-
 ## 📦 Installation
 
 Add it to your `pubspec.yaml`:
@@ -64,6 +46,10 @@ Use `useDynamicMeasurement: false` to eliminate layout jumps and maximize perfor
 
 For widgets with highly variable size, use `true` and optionally apply batch updates or smooth resize techniques.
 
+### Demo
+<img src="screenshots/1.gif" width="200" height="417" />
+
 ## 💡 Inspired by
 
 This package was built to fill the gap between `Wrap` layout and `ListView.builder` efficiency.
+
