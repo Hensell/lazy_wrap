@@ -47,7 +47,7 @@ Use `useDynamicMeasurement: false` to eliminate layout jumps and maximize perfor
 For widgets with highly variable size, use `true` and optionally apply batch updates or smooth resize techniques.
 
 ### Demo
-<img src="screenshots/1.gif" width="200" height="417" />
+<img src="https://github.com/Hensell/lazy_wrap/raw/1e3d41ad106b2f5f46033a23cff29954a83ef135/screenshots/1.gif" width="200" height="417" />
 
 ## 💡 Inspired by
 
