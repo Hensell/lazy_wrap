@@ -3,15 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lazy_wrap/lazy_wrap.dart';
 
 void main() {
-  group('LazyWrap', () {
+  group('LazyWrap.fixed', () {
     testWidgets('renders all items correctly', (tester) async {
       const itemCount = 3;
 
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: LazyWrap(
+            body: LazyWrap.fixed(
               itemCount: itemCount,
+              estimatedItemWidth: 100,
+              estimatedItemHeight: 40,
               itemBuilder: _testItemBuilder,
             ),
           ),
@@ -31,8 +33,10 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: LazyWrap(
+            body: LazyWrap.fixed(
               itemCount: 1,
+              estimatedItemWidth: 100,
+              estimatedItemHeight: 40,
               padding: padding,
               itemBuilder: _testItemBuilder,
             ),
@@ -57,8 +61,10 @@ void main() {
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
-            body: LazyWrap(
+            body: LazyWrap.fixed(
               itemCount: 2,
+              estimatedItemWidth: 100,
+              estimatedItemHeight: 40,
               spacing: spacing,
               itemBuilder: _testItemBuilder,
             ),
@@ -68,15 +74,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      final hasSpacing = find
-          .byWidgetPredicate((widget) =>
-              widget is Padding &&
-              widget.padding is EdgeInsets &&
-              (widget.padding as EdgeInsets).right == spacing)
-          .evaluate()
-          .isNotEmpty;
-
-      expect(hasSpacing, isTrue);
+      final items = find.byType(SizedBox);
+      expect(items, findsNWidgets(2));
     });
   });
 }

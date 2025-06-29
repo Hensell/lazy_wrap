@@ -14,8 +14,14 @@ class LazyWrapDemoApp extends StatelessWidget {
       title: 'LazyWrap Demo',
       home: Scaffold(
         appBar: AppBar(title: const Text('LazyWrap Demo')),
-        body: LazyWrap(
+        body: LazyWrap.fixed(
           itemCount: 10000,
+          estimatedItemWidth: 160,
+          estimatedItemHeight: 100,
+          spacing: 12,
+          runSpacing: 12,
+          padding: const EdgeInsets.all(16),
+          rowAlignment: MainAxisAlignment.start,
           itemBuilder: (context, index) {
             return Card(
               child: Padding(
@@ -24,9 +30,6 @@ class LazyWrapDemoApp extends StatelessWidget {
               ),
             );
           },
-          spacing: 12,
-          runSpacing: 12,
-          padding: const EdgeInsets.all(16),
         ),
       ),
     );

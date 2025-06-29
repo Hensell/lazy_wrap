@@ -39,3 +39,6 @@
 
 ## [0.0.8+5] 
 - Update dynamic lazy wrap.
+
+## [0.0.8+6] 
+- Added constructors.
