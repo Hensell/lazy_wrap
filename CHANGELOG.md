@@ -36,3 +36,6 @@
 
 ## [0.0.8+4] 
 - Update default values.
+
+## [0.0.8+5] 
+- Update dynamic lazy wrap.
