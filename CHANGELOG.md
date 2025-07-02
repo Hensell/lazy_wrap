@@ -48,3 +48,6 @@
 
 ## [0.0.9+1] 
 - Update screenshot.
+
+## [0.0.9+2] 
+- Update screenshot.
