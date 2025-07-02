@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 typedef OnWidgetSizeChange = void Function(Size size);
 
+/// Utility widget that notifies on child size change (used for measuring dynamic widgets).
 class MeasureSize extends StatefulWidget {
   final Widget child;
   final OnWidgetSizeChange onChange;
@@ -29,6 +30,9 @@ class _MeasureSizeState extends State<MeasureSize> {
   }
 }
 
+/// A lazy-loading, wrap-style layout for items of dynamic/unknown size.
+/// Supports both vertical and horizontal scroll directions.
+/// Only renders widgets that are currently visible or close to the viewport.
 class DynamicLazyWrap extends StatefulWidget {
   final int itemCount;
   final Widget Function(BuildContext, int) itemBuilder;
@@ -37,6 +41,9 @@ class DynamicLazyWrap extends StatefulWidget {
   final EdgeInsetsGeometry padding;
   final MainAxisAlignment rowAlignment;
   final int batchSize;
+
+  /// Main scroll direction. If vertical, builds rows; if horizontal, builds columns.
+  final Axis scrollDirection;
 
   const DynamicLazyWrap({
     super.key,
@@ -47,6 +54,7 @@ class DynamicLazyWrap extends StatefulWidget {
     this.padding = EdgeInsets.zero,
     this.rowAlignment = MainAxisAlignment.start,
     required this.batchSize,
+    this.scrollDirection = Axis.vertical,
   });
 
   @override
@@ -73,6 +81,7 @@ class _DynamicLazyWrapState extends State<DynamicLazyWrap> {
   }
 
   void _onScroll() {
+    // Trigger loading more when near the end of the scroll in main axis.
     if (_controller.position.pixels >=
             _controller.position.maxScrollExtent - 200 &&
         !_isLoadingMore) {
@@ -123,24 +132,31 @@ class _DynamicLazyWrapState extends State<DynamicLazyWrap> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth - widget.padding.horizontal;
+        final isVertical = widget.scrollDirection == Axis.vertical;
+        final availableMain = isVertical
+            ? constraints.maxWidth - widget.padding.horizontal
+            : constraints.maxHeight - widget.padding.vertical;
 
         _maybeLoadMoreIfViewportNotFull(constraints);
 
         return SingleChildScrollView(
           controller: _controller,
           padding: widget.padding,
-          child: _buildRealWrap(context, availableWidth, totalToShow),
+          scrollDirection: widget.scrollDirection,
+          child: _buildWrap(context, availableMain, totalToShow, isVertical),
         );
       },
     );
   }
 
-  Widget _buildRealWrap(
-      BuildContext context, double availableWidth, int itemLimit) {
-    List<List<Widget>> rows = [];
-    double xOffset = 0;
-    List<Widget> currentRow = [];
+  /// Groups widgets into rows (if vertical) or columns (if horizontal),
+  /// measuring each item's true size, and only rendering what's in the viewport.
+  Widget _buildWrap(BuildContext context, double availableMain, int itemLimit,
+      bool isVertical) {
+    // For vertical: group = row, for horizontal: group = column.
+    List<List<Widget>> groups = [];
+    double mainOffset = 0;
+    List<Widget> currentGroup = [];
 
     for (int i = 0; i < itemLimit; i++) {
       final size = _itemSizes[i];
@@ -153,40 +169,51 @@ class _DynamicLazyWrapState extends State<DynamicLazyWrap> {
         );
       }
 
-      final width = size?.width ?? 0;
-      if (xOffset + width > availableWidth && currentRow.isNotEmpty) {
-        rows.add(currentRow);
-        currentRow = [];
-        xOffset = 0;
+      final mainSize = isVertical ? size?.width ?? 0 : size?.height ?? 0;
+
+      if (mainOffset + mainSize > availableMain && currentGroup.isNotEmpty) {
+        groups.add(currentGroup);
+        currentGroup = [];
+        mainOffset = 0;
       }
 
-      currentRow.add(
+      currentGroup.add(
         Padding(
-          padding: EdgeInsets.only(right: widget.spacing),
+          padding: isVertical
+              ? EdgeInsets.only(right: widget.spacing)
+              : EdgeInsets.only(bottom: widget.spacing),
           child: size != null
-              ? SizedBox(width: size.width, height: size.height, child: child)
+              ? SizedBox(
+                  width: size.width,
+                  height: size.height,
+                  child: child,
+                )
               : child,
         ),
       );
-      xOffset += width + widget.spacing;
+      mainOffset += mainSize + widget.spacing;
     }
-    if (currentRow.isNotEmpty) {
-      rows.add(currentRow);
+    if (currentGroup.isNotEmpty) {
+      groups.add(currentGroup);
     }
 
-    return Column(
+    return Flex(
+      direction: isVertical ? Axis.vertical : Axis.horizontal,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...rows.map((row) => Padding(
-              padding: EdgeInsets.only(bottom: widget.runSpacing),
+        ...groups.map((group) => Padding(
+              padding: isVertical
+                  ? EdgeInsets.only(bottom: widget.runSpacing)
+                  : EdgeInsets.only(right: widget.runSpacing),
               child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
+                scrollDirection: isVertical ? Axis.horizontal : Axis.vertical,
                 clipBehavior: Clip.hardEdge,
                 physics: const NeverScrollableScrollPhysics(),
-                child: Row(
+                child: Flex(
+                  direction: isVertical ? Axis.horizontal : Axis.vertical,
                   mainAxisAlignment: widget.rowAlignment,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: row,
+                  children: group,
                 ),
               ),
             )),

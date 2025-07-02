@@ -2,12 +2,13 @@
 
 A Flutter widget that combines the layout behavior of `Wrap` with the performance of `ListView.builder`.
 
-Perfect for displaying cards or widgets in multiple columns with efficient vertical scrolling.
+Perfect for displaying cards or widgets in multiple columns with efficient vertical **or horizontal** scrolling.
 
 ## 🚀 Quick Example
 
 ```dart
 // Fixed-size version (better performance, no layout jumps)
+// Now with scrollDirection: Axis.horizontal for horizontal grids!
 LazyWrap.fixed(
   itemCount: items.length,
   estimatedItemWidth: 120,
@@ -16,6 +17,7 @@ LazyWrap.fixed(
   spacing: 8,
   runSpacing: 8,
   padding: EdgeInsets.all(12),
+  scrollDirection: Axis.vertical,   // or Axis.horizontal
 )
 
 // Dynamic-size version (auto-measures height, good for complex UIs)
@@ -26,6 +28,7 @@ LazyWrap.dynamic(
   runSpacing: 8,
   padding: EdgeInsets.all(12),
   batchSize: 500,
+  scrollDirection: Axis.horizontal, // horizontal example
 )
 ```
 
@@ -36,6 +39,7 @@ LazyWrap.dynamic(
 - Responsive to available width
 - Customizable spacing, padding, and alignment
 - Supports both fixed and dynamic size measurement
+- **Supports both vertical and horizontal scroll direction**
 - Clean animation and styling ready
 
 ## 📦 Installation
@@ -44,7 +48,7 @@ Add it to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  lazy_wrap: ^0.0.8
+  lazy_wrap: ^0.0.9
 ```
 
 ## 🛠 Usage Tip
@@ -65,3 +69,22 @@ Check it out in action:
 ## 💡 Inspired by
 
 This package was built to fill the gap between `Wrap` layout and `ListView.builder` efficiency.
+
+## ☕ Support & Donate
+
+If this package helps you or your business, consider buying me a coffee!
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/hensell)
+
+
+## 📣 Maintainer
+
+Hey, I'm Hensell.  
+Check out my [GitHub profile](https://github.com/Hensell) or visit [hensell.dev](https://hensell.dev) for more projects and updates.
+
+
+## Contributors
+
+<a href="https://github.com/Hensell/lazy_wrap/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Hensell/lazy_wrap" />
+</a>

@@ -1,6 +1,6 @@
 name: lazy_wrap
 description: A Flutter widget that mimics Wrap layout behavior with lazy rendering using ListView.builder.
-version: 0.0.8+6
+version: 0.0.9
 homepage: https://github.com/henselldev/lazy_wrap
 license: MIT
 

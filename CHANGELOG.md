@@ -42,3 +42,6 @@
 
 ## [0.0.8+6] 
 - Added constructors.
+
+## [0.0.9] 
+- Added horizontal scroll.

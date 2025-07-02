@@ -1,6 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
+/// A performant, lazy-loading wrap for grids with fixed item sizes.
+/// Optimized: columns/rows are cached per constraints, and rebuilds are minimized.
+/// Only visible items are rendered, ideal for massive lists/grids.
 class FixedLazyWrap extends StatefulWidget {
   final int itemCount;
   final Widget Function(BuildContext, int) itemBuilder;
@@ -10,6 +13,7 @@ class FixedLazyWrap extends StatefulWidget {
   final double estimatedItemWidth;
   final double estimatedItemHeight;
   final MainAxisAlignment rowAlignment;
+  final Axis scrollDirection;
 
   const FixedLazyWrap({
     super.key,
@@ -21,7 +25,10 @@ class FixedLazyWrap extends StatefulWidget {
     this.estimatedItemWidth = 320,
     this.estimatedItemHeight = 300,
     this.rowAlignment = MainAxisAlignment.start,
-  });
+    this.scrollDirection = Axis.vertical,
+  })  : assert(itemCount >= 0, 'itemCount must be >= 0'),
+        assert(estimatedItemWidth > 0, 'estimatedItemWidth must be > 0'),
+        assert(estimatedItemHeight > 0, 'estimatedItemHeight must be > 0');
 
   @override
   State<FixedLazyWrap> createState() => _FixedLazyWrapState();
@@ -29,127 +36,155 @@ class FixedLazyWrap extends StatefulWidget {
 
 class _FixedLazyWrapState extends State<FixedLazyWrap> {
   final ScrollController _scrollController = ScrollController();
+  final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier(0);
 
-  double _scrollOffset = 0;
-  double _viewportHeight = 0;
+  double _viewportSize = 0;
+  int _itemsPerGroup = 1; // Columns if vertical, rows if horizontal
+  double _lastAvailableMain = -1;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(() {
-      setState(() {
-        _scrollOffset = _scrollController.offset;
-      });
+      _scrollOffsetNotifier.value = _scrollController.offset;
     });
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _scrollOffsetNotifier.dispose();
     super.dispose();
+  }
+
+  /// Calculates how many items fit per group (row/col) based on constraints and direction.
+  void _updateItemsPerGroup(double availableMain, bool isVertical) {
+    if (_lastAvailableMain == availableMain) return;
+    _lastAvailableMain = availableMain;
+    final itemMain =
+        isVertical ? widget.estimatedItemWidth : widget.estimatedItemHeight;
+    final spacing = widget.spacing;
+    _itemsPerGroup = max(
+      1,
+      ((availableMain + spacing) / (itemMain + spacing)).floor(),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (_, constraints) {
-        final availableWidth = constraints.maxWidth - widget.padding.horizontal;
-        _viewportHeight = constraints.maxHeight;
+        final isVertical = widget.scrollDirection == Axis.vertical;
+        final availableMain = isVertical
+            ? constraints.maxWidth - widget.padding.horizontal
+            : constraints.maxHeight - widget.padding.vertical;
+        final availableCross =
+            isVertical ? constraints.maxHeight : constraints.maxWidth;
 
-        final List<Widget> visibleRows = [];
-        double yOffset = 0;
-        double rowHeight = 0;
-        double xOffset = 0;
+        _viewportSize = availableCross;
+        _updateItemsPerGroup(availableMain, isVertical);
 
-        int rowIndex = 0;
-        int currentIndex = 0;
-        const buffer = 500.0;
-        const extraBreakPadding = 17.0;
+        // The scroll view and stack do NOT rebuild; only groups do.
+        return Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _scrollController,
+              scrollDirection: widget.scrollDirection,
+              padding: widget.padding,
+              child: ValueListenableBuilder<double>(
+                valueListenable: _scrollOffsetNotifier,
+                builder: (context, scrollOffset, _) {
+                  final List<Widget> visibleGroups = [];
+                  double mainOffset = 0;
+                  double groupSize = 0;
+                  int groupIndex = 0;
+                  int currentIndex = 0;
+                  const buffer = 500.0;
 
-        final estRowHeight = widget.estimatedItemHeight + widget.runSpacing;
-        final estStartY = max(0, _scrollOffset - buffer);
-        final estStartRow = (estStartY / estRowHeight).floor();
+                  // Fast skip to the first visible group.
+                  final estGroupSize = isVertical
+                      ? widget.estimatedItemHeight + widget.runSpacing
+                      : widget.estimatedItemWidth + widget.runSpacing;
+                  final estStartMain = max(0, scrollOffset - buffer);
+                  final estStartGroup = (estStartMain / estGroupSize).floor();
 
-        // Salta filas fuera de vista
-        while (rowIndex < estStartRow && currentIndex < widget.itemCount) {
-          xOffset = 0;
-          while (currentIndex < widget.itemCount) {
-            if (xOffset + widget.estimatedItemWidth >
-                    availableWidth - extraBreakPadding &&
-                xOffset > 0) {
-              break;
-            }
-            xOffset += widget.estimatedItemWidth + widget.spacing;
-            currentIndex++;
-          }
-          yOffset += estRowHeight;
-          rowIndex++;
-        }
+                  currentIndex = estStartGroup * _itemsPerGroup;
+                  mainOffset = estStartGroup * estGroupSize;
+                  groupIndex = estStartGroup;
 
-        // Renderiza las filas visibles
-        while (currentIndex < widget.itemCount) {
-          final rowItems = <Widget>[];
-          xOffset = 0;
-          rowHeight = 0;
+                  while (currentIndex < widget.itemCount) {
+                    final groupItems = <Widget>[];
+                    int added = 0;
+                    for (;
+                        added < _itemsPerGroup &&
+                            currentIndex < widget.itemCount;
+                        ++added, ++currentIndex) {
+                      final isLastInGroup = (added == _itemsPerGroup - 1) ||
+                          (currentIndex == widget.itemCount - 1);
+                      groupItems.add(
+                        Padding(
+                          padding: isLastInGroup
+                              ? EdgeInsets.zero
+                              : (isVertical
+                                  ? EdgeInsets.only(right: widget.spacing)
+                                  : EdgeInsets.only(bottom: widget.spacing)),
+                          child: SizedBox(
+                            width: widget.estimatedItemWidth,
+                            height: widget.estimatedItemHeight,
+                            child: widget.itemBuilder(context, currentIndex),
+                          ),
+                        ),
+                      );
+                    }
 
-          while (currentIndex < widget.itemCount) {
-            if (xOffset + widget.estimatedItemWidth >
-                    availableWidth - extraBreakPadding &&
-                xOffset > 0) {
-              break;
-            }
+                    groupSize = isVertical
+                        ? widget.estimatedItemHeight
+                        : widget.estimatedItemWidth;
+                    final groupMainStart = mainOffset;
+                    final groupMainEnd = mainOffset + groupSize;
+                    final groupCrossStart = isVertical
+                        ? widget.padding.resolve(TextDirection.ltr).left
+                        : widget.padding.resolve(TextDirection.ltr).top;
 
-            rowItems.add(
-              Padding(
-                padding: EdgeInsets.only(right: widget.spacing),
-                child: SizedBox(
-                  width: widget.estimatedItemWidth,
-                  height: widget.estimatedItemHeight,
-                  child: widget.itemBuilder(context, currentIndex),
-                ),
+                    final shouldRender = groupMainEnd >=
+                            scrollOffset - buffer &&
+                        groupMainStart <= scrollOffset + _viewportSize + buffer;
+
+                    if (shouldRender) {
+                      visibleGroups.add(Positioned(
+                        top: isVertical ? groupMainStart : groupCrossStart,
+                        left: isVertical ? groupCrossStart : groupMainStart,
+                        child: RepaintBoundary(
+                          child: SizedBox(
+                            width: isVertical ? availableMain : groupSize,
+                            height: isVertical ? groupSize : availableMain,
+                            child: Flex(
+                              direction:
+                                  isVertical ? Axis.horizontal : Axis.vertical,
+                              mainAxisAlignment: widget.rowAlignment,
+                              children: groupItems,
+                            ),
+                          ),
+                        ),
+                      ));
+                    }
+
+                    mainOffset += estGroupSize;
+                    groupIndex++;
+                    if (mainOffset > scrollOffset + _viewportSize + buffer) {
+                      break;
+                    }
+                  }
+
+                  return SizedBox(
+                    width: isVertical ? null : mainOffset,
+                    height: isVertical ? mainOffset : null,
+                    child: Stack(children: visibleGroups),
+                  );
+                },
               ),
-            );
-
-            xOffset += widget.estimatedItemWidth + widget.spacing;
-            rowHeight = max(rowHeight, widget.estimatedItemHeight);
-            currentIndex++;
-          }
-
-          final rowTop = yOffset;
-          final rowBottom = yOffset + rowHeight;
-
-          final shouldRender = rowBottom >= _scrollOffset - buffer &&
-              rowTop <= _scrollOffset + _viewportHeight + buffer;
-
-          if (shouldRender) {
-            visibleRows.add(Positioned(
-              top: rowTop,
-              left: widget.padding.resolve(TextDirection.ltr).left,
-              child: RepaintBoundary(
-                child: SizedBox(
-                  width: availableWidth,
-                  child: Row(
-                    mainAxisAlignment: widget.rowAlignment,
-                    children: rowItems,
-                  ),
-                ),
-              ),
-            ));
-          }
-
-          yOffset += rowHeight + widget.runSpacing;
-          rowIndex++;
-
-          if (yOffset > _scrollOffset + _viewportHeight + buffer) break;
-        }
-
-        return SingleChildScrollView(
-          controller: _scrollController,
-          padding: widget.padding,
-          child: SizedBox(
-            height: yOffset,
-            child: Stack(children: visibleRows),
-          ),
+            ),
+          ],
         );
       },
     );
