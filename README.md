@@ -48,7 +48,7 @@ Add it to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  lazy_wrap: ^0.0.9+2
+  lazy_wrap: ^0.0.9+3
 ```
 
 ## 🛠 Usage Tip
@@ -59,7 +59,7 @@ For widgets with highly variable size, use `LazyWrap.dynamic` and optionally app
 
 ## 🌀 Example
 
-![LazyWrap Demo](https://github.com/Hensell/lazy_wrap/raw/a62dbc2226406e9f8b47811dd1522c04a2803cf5/screenshots/1.gif)
+![LazyWrap Demo](https://github.com/Hensell/lazy_wrap_demo/raw/101d2a777d64b8ef283dee3c62da374d80cab835/screenshots/1.gif)
 
 ### 💻 Live Demo
 
