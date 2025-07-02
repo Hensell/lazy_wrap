@@ -59,7 +59,7 @@ For widgets with highly variable size, use `LazyWrap.dynamic` and optionally app
 
 ## 🌀 Example
 
-![LazyWrap Demo](https://github.com/Hensell/lazy_wrap/raw/1e3d41ad106b2f5f46033a23cff29954a83ef135/screenshots/1.gif)
+![LazyWrap Demo](https://github.com/Hensell/lazy_wrap/raw/a62dbc2226406e9f8b47811dd1522c04a2803cf5/screenshots/1.gif)
 
 ### 💻 Live Demo
 
