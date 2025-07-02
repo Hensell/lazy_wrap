@@ -97,7 +97,7 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
                   final List<Widget> visibleGroups = [];
                   double mainOffset = 0;
                   double groupSize = 0;
-                  int groupIndex = 0;
+
                   int currentIndex = 0;
                   const buffer = 500.0;
 
@@ -110,7 +110,6 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
 
                   currentIndex = estStartGroup * _itemsPerGroup;
                   mainOffset = estStartGroup * estGroupSize;
-                  groupIndex = estStartGroup;
 
                   while (currentIndex < widget.itemCount) {
                     final groupItems = <Widget>[];
@@ -170,7 +169,7 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
                     }
 
                     mainOffset += estGroupSize;
-                    groupIndex++;
+
                     if (mainOffset > scrollOffset + _viewportSize + buffer) {
                       break;
                     }
