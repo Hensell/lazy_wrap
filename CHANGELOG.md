@@ -45,3 +45,6 @@
 
 ## [0.0.9] 
 - Added horizontal scroll.
+
+## [0.0.9+1] 
+- Update screenshot.
