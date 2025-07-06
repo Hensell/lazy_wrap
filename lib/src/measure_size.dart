@@ -10,15 +10,18 @@ typedef OnWidgetSizeChange = void Function(Size size);
 /// Useful for building layouts that depend on dynamic, unknown, or
 /// runtime-calculated widget sizes (e.g. in virtualized/lazy wraps).
 class MeasureSize extends StatefulWidget {
-  final Widget child;
-  final OnWidgetSizeChange onChange;
-
+  /// {@macro measure_size}
   const MeasureSize({
-    super.key,
     required this.child,
     required this.onChange,
+    super.key,
   });
 
+  /// The widget whose size you want to measure.
+  final Widget child;
+
+  /// Callback invoked whenever the child's size changes.
+  final OnWidgetSizeChange onChange;
   @override
   State<MeasureSize> createState() => _MeasureSizeState();
 }
@@ -45,7 +48,7 @@ class _MeasureSizeState extends State<MeasureSize> {
     );
   }
 
-  /// Checks the current context size and calls [onChange] if it changed.
+  /// Checks the current context size and calls onChange if it changed.
   void _notifySize() {
     final contextSize = context.size;
     if (contextSize != null && contextSize != oldSize) {

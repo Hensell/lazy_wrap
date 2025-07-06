@@ -5,20 +5,11 @@ import 'package:flutter/material.dart';
 /// Optimized: columns/rows are cached per constraints, and rebuilds are minimized.
 /// Only visible items are rendered, ideal for massive lists/grids.
 class FixedLazyWrap extends StatefulWidget {
-  final int itemCount;
-  final Widget Function(BuildContext, int) itemBuilder;
-  final double spacing;
-  final double runSpacing;
-  final EdgeInsetsGeometry padding;
-  final double estimatedItemWidth;
-  final double estimatedItemHeight;
-  final MainAxisAlignment rowAlignment;
-  final Axis scrollDirection;
-
+  /// {@macro fixed_lazy_wrap}
   const FixedLazyWrap({
-    super.key,
     required this.itemCount,
     required this.itemBuilder,
+    super.key,
     this.spacing = 8,
     this.runSpacing = 8,
     this.padding = EdgeInsets.zero,
@@ -30,6 +21,32 @@ class FixedLazyWrap extends StatefulWidget {
         assert(estimatedItemWidth > 0, 'estimatedItemWidth must be > 0'),
         assert(estimatedItemHeight > 0, 'estimatedItemHeight must be > 0');
 
+  /// The total number of items to display.
+  final int itemCount;
+
+  /// Called to build each child widget by index.
+  final Widget Function(BuildContext, int) itemBuilder;
+
+  /// Horizontal space between items.
+  final double spacing;
+
+  /// Vertical space between wrap runs.
+  final double runSpacing;
+
+  /// Padding around the wrap content.
+  final EdgeInsetsGeometry padding;
+
+  /// Estimated width for each item (required for virtualization).
+  final double estimatedItemWidth;
+
+  /// Estimated height for each item (required for virtualization).
+  final double estimatedItemHeight;
+
+  /// How items are aligned within a row.
+  final MainAxisAlignment rowAlignment;
+
+  /// Scroll direction (vertical or horizontal).
+  final Axis scrollDirection;
   @override
   State<FixedLazyWrap> createState() => _FixedLazyWrapState();
 }
@@ -94,11 +111,11 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
               child: ValueListenableBuilder<double>(
                 valueListenable: _scrollOffsetNotifier,
                 builder: (context, scrollOffset, _) {
-                  final List<Widget> visibleGroups = [];
+                  final visibleGroups = <Widget>[];
                   double mainOffset = 0;
                   double groupSize = 0;
 
-                  int currentIndex = 0;
+                  var currentIndex = 0;
                   const buffer = 500.0;
 
                   // Fast skip to the first visible group.
@@ -113,7 +130,7 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
 
                   while (currentIndex < widget.itemCount) {
                     final groupItems = <Widget>[];
-                    int added = 0;
+                    var added = 0;
                     for (;
                         added < _itemsPerGroup &&
                             currentIndex < widget.itemCount;

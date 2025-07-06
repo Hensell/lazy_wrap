@@ -54,3 +54,6 @@
 
 ## [0.0.9+3] 
 - Update screenshot.
+
+## [0.1.0] 
+- Update documentation.

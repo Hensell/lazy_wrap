@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 
+/// Signature for callbacks invoked when a widget's size changes.
+///
+/// Receives the new [Size] of the widget.
 typedef OnWidgetSizeChange = void Function(Size size);
 
 /// Utility widget that notifies on child size change (used for measuring dynamic widgets).
 class MeasureSize extends StatefulWidget {
-  final Widget child;
-  final OnWidgetSizeChange onChange;
-
+  /// {@macro measure_size}
   const MeasureSize({
-    super.key,
     required this.child,
     required this.onChange,
+    super.key,
   });
+
+  /// The widget whose size will be measured.
+  final Widget child;
+
+  /// Callback invoked with the new size whenever [child] changes dimensions.
+  final OnWidgetSizeChange onChange;
 
   @override
   State<MeasureSize> createState() => _MeasureSizeState();
@@ -34,29 +41,42 @@ class _MeasureSizeState extends State<MeasureSize> {
 /// Supports both vertical and horizontal scroll directions.
 /// Only renders widgets that are currently visible or close to the viewport.
 class DynamicLazyWrap extends StatefulWidget {
-  final int itemCount;
-  final Widget Function(BuildContext, int) itemBuilder;
-  final double spacing;
-  final double runSpacing;
-  final EdgeInsetsGeometry padding;
-  final MainAxisAlignment rowAlignment;
-  final int batchSize;
-
-  /// Main scroll direction. If vertical, builds rows; if horizontal, builds columns.
-  final Axis scrollDirection;
-
+  /// {@macro dynamic_lazy_wrap}
   const DynamicLazyWrap({
-    super.key,
     required this.itemCount,
     required this.itemBuilder,
+    required this.batchSize,
+    super.key,
     this.spacing = 8,
     this.runSpacing = 8,
     this.padding = EdgeInsets.zero,
     this.rowAlignment = MainAxisAlignment.start,
-    required this.batchSize,
     this.scrollDirection = Axis.vertical,
   });
 
+  /// The total number of items to display.
+  final int itemCount;
+
+  /// Called to build each child widget by index.
+  final Widget Function(BuildContext, int) itemBuilder;
+
+  /// Horizontal space between items.
+  final double spacing;
+
+  /// Vertical space between wrap runs.
+  final double runSpacing;
+
+  /// Padding around the wrap content.
+  final EdgeInsetsGeometry padding;
+
+  /// How items are aligned within a row.
+  final MainAxisAlignment rowAlignment;
+
+  /// Number of items to render ahead of the viewport (batch size).
+  final int batchSize;
+
+  /// Scroll direction (vertical or horizontal).
+  final Axis scrollDirection;
   @override
   State<DynamicLazyWrap> createState() => _DynamicLazyWrapState();
 }
@@ -154,13 +174,13 @@ class _DynamicLazyWrapState extends State<DynamicLazyWrap> {
   Widget _buildWrap(BuildContext context, double availableMain, int itemLimit,
       bool isVertical) {
     // For vertical: group = row, for horizontal: group = column.
-    List<List<Widget>> groups = [];
+    final groups = <List<Widget>>[];
     double mainOffset = 0;
-    List<Widget> currentGroup = [];
+    var currentGroup = <Widget>[];
 
-    for (int i = 0; i < itemLimit; i++) {
+    for (var i = 0; i < itemLimit; i++) {
       final size = _itemSizes[i];
-      Widget child = widget.itemBuilder(context, i);
+      var child = widget.itemBuilder(context, i);
 
       if (size == null) {
         child = MeasureSize(
@@ -207,7 +227,6 @@ class _DynamicLazyWrapState extends State<DynamicLazyWrap> {
                   : EdgeInsets.only(right: widget.runSpacing),
               child: SingleChildScrollView(
                 scrollDirection: isVertical ? Axis.horizontal : Axis.vertical,
-                clipBehavior: Clip.hardEdge,
                 physics: const NeverScrollableScrollPhysics(),
                 child: Flex(
                   direction: isVertical ? Axis.horizontal : Axis.vertical,

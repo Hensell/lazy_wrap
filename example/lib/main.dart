@@ -21,7 +21,6 @@ class LazyWrapDemoApp extends StatelessWidget {
           spacing: 12,
           runSpacing: 12,
           padding: const EdgeInsets.all(16),
-          rowAlignment: MainAxisAlignment.start,
           itemBuilder: (context, index) {
             return Card(
               child: Padding(

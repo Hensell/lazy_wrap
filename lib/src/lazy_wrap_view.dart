@@ -28,6 +28,44 @@ import 'package:lazy_wrap/src/fixed_lazy_wrap.dart';
 /// )
 /// ```
 class LazyWrap extends StatelessWidget {
+  /// Dynamic mode: For lists with variable sized widgets.
+  /// Automatically measures sizes. Slightly heavier, but flexible.
+  const LazyWrap.dynamic({
+    required this.itemCount,
+    required this.itemBuilder,
+    super.key,
+    this.spacing = 8,
+    this.runSpacing = 8,
+    this.padding = EdgeInsets.zero,
+    this.batchSize = 500,
+    this.rowAlignment = MainAxisAlignment.start,
+    this.scrollDirection = Axis.vertical,
+  })  : isDynamic = true,
+        estimatedItemWidth = null,
+        estimatedItemHeight = null,
+        assert(batchSize != null && batchSize > 0,
+            'batchSize must be provided and > 0 for dynamic mode');
+
+  /// Fixed mode: For grids or lists where all items are about the same size.
+  /// Most efficient and smooth.
+  const LazyWrap.fixed({
+    required this.itemCount,
+    required this.itemBuilder,
+    required this.estimatedItemWidth,
+    required this.estimatedItemHeight,
+    super.key,
+    this.spacing = 8,
+    this.runSpacing = 8,
+    this.padding = EdgeInsets.zero,
+    this.rowAlignment = MainAxisAlignment.start,
+    this.scrollDirection = Axis.vertical,
+  })  : isDynamic = false,
+        batchSize = null,
+        assert(estimatedItemWidth != null && estimatedItemWidth > 0,
+            'estimatedItemWidth must be provided and > 0 for fixed mode'),
+        assert(estimatedItemHeight != null && estimatedItemHeight > 0,
+            'estimatedItemHeight must be provided and > 0 for fixed mode');
+
   /// Number of items to build in the list.
   final int itemCount;
 
@@ -60,44 +98,6 @@ class LazyWrap extends StatelessWidget {
 
   /// Scroll direction (vertical or horizontal). Default: Axis.vertical.
   final Axis scrollDirection;
-
-  /// Fixed mode: For grids or lists where all items are about the same size.
-  /// Most efficient and smooth.
-  const LazyWrap.fixed({
-    super.key,
-    required this.itemCount,
-    required this.itemBuilder,
-    this.spacing = 8,
-    this.runSpacing = 8,
-    this.padding = EdgeInsets.zero,
-    required this.estimatedItemWidth,
-    required this.estimatedItemHeight,
-    this.rowAlignment = MainAxisAlignment.start,
-    this.scrollDirection = Axis.vertical,
-  })  : isDynamic = false,
-        batchSize = null,
-        assert(estimatedItemWidth != null && estimatedItemWidth > 0,
-            'estimatedItemWidth must be provided and > 0 for fixed mode'),
-        assert(estimatedItemHeight != null && estimatedItemHeight > 0,
-            'estimatedItemHeight must be provided and > 0 for fixed mode');
-
-  /// Dynamic mode: For lists with variable sized widgets.
-  /// Automatically measures sizes. Slightly heavier, but flexible.
-  const LazyWrap.dynamic({
-    super.key,
-    required this.itemCount,
-    required this.itemBuilder,
-    this.spacing = 8,
-    this.runSpacing = 8,
-    this.padding = EdgeInsets.zero,
-    this.batchSize = 500,
-    this.rowAlignment = MainAxisAlignment.start,
-    this.scrollDirection = Axis.vertical,
-  })  : isDynamic = true,
-        estimatedItemWidth = null,
-        estimatedItemHeight = null,
-        assert(batchSize != null && batchSize > 0,
-            'batchSize must be provided and > 0 for dynamic mode');
 
   @override
   Widget build(BuildContext context) {
