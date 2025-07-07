@@ -58,6 +58,7 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
   double _viewportSize = 0;
   int _itemsPerGroup = 1; // Columns if vertical, rows if horizontal
   double _lastAvailableMain = -1;
+  double _lastMainAxisExtent = 0; // Para validar el scroll
 
   @override
   void initState() {
@@ -74,7 +75,6 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
     super.dispose();
   }
 
-  /// Calculates how many items fit per group (row/col) based on constraints and direction.
   void _updateItemsPerGroup(double availableMain, bool isVertical) {
     if (_lastAvailableMain == availableMain) return;
     _lastAvailableMain = availableMain;
@@ -85,6 +85,17 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
       1,
       ((availableMain + spacing) / (itemMain + spacing)).floor(),
     );
+  }
+
+  /// Ajusta el scroll si está fuera del rango válido.
+  void _fixScrollIfNeeded(double maxScrollExtent) {
+    // maxScrollExtent puede ser menor después de rotar.
+    if (_scrollController.hasClients) {
+      // Si el scroll actual es mayor al máximo permitido, corrígelo.
+      if (_scrollController.offset > maxScrollExtent) {
+        _scrollController.jumpTo(maxScrollExtent);
+      }
+    }
   }
 
   @override
@@ -101,7 +112,28 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
         _viewportSize = availableCross;
         _updateItemsPerGroup(availableMain, isVertical);
 
-        // The scroll view and stack do NOT rebuild; only groups do.
+        // Calcular el total de grupos y tamaño total del scroll.
+        final groupCount = (widget.itemCount / _itemsPerGroup).ceil();
+        final estGroupSize = isVertical
+            ? widget.estimatedItemHeight + widget.runSpacing
+            : widget.estimatedItemWidth + widget.runSpacing;
+        final mainAxisExtent =
+            max(0.0, groupCount * estGroupSize - widget.runSpacing);
+
+        // Si el tamaño cambió, corrige el scroll si es necesario.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // Solo ajusta si el tamaño real cambió (por ejemplo, cambio de orientación)
+          if (_lastMainAxisExtent != mainAxisExtent) {
+            _lastMainAxisExtent = mainAxisExtent;
+            _fixScrollIfNeeded(
+              max(0, mainAxisExtent - _viewportSize),
+            );
+          }
+          // Siempre fuerza un rebuild visual para mostrar bien los elementos.
+          _scrollOffsetNotifier.value = _scrollController.offset;
+        });
+
+        // El resto igual que antes.
         return Stack(
           children: [
             SingleChildScrollView(
@@ -118,13 +150,8 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
                   var currentIndex = 0;
                   const buffer = 500.0;
 
-                  // Fast skip to the first visible group.
-                  final estGroupSize = isVertical
-                      ? widget.estimatedItemHeight + widget.runSpacing
-                      : widget.estimatedItemWidth + widget.runSpacing;
                   final estStartMain = max(0, scrollOffset - buffer);
                   final estStartGroup = (estStartMain / estGroupSize).floor();
-
                   currentIndex = estStartGroup * _itemsPerGroup;
                   mainOffset = estStartGroup * estGroupSize;
 

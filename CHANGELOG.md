@@ -57,3 +57,6 @@
 
 ## [0.1.0] 
 - Update documentation.
+
+## [0.1.1] 
+- Bug fixed.

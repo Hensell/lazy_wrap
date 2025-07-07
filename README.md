@@ -48,7 +48,7 @@ Add it to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  lazy_wrap: ^0.1.0
+  lazy_wrap: ^0.1.1
 ```
 
 ## 🛠 Usage Tip
