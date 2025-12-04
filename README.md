@@ -1,87 +1,114 @@
 # lazy_wrap
 
-A Flutter widget that combines the layout behavior of `Wrap` with the performance of `ListView.builder`.
+A performant Flutter widget that combines the layout of `Wrap` with lazy rendering. Perfect for large lists with variable-sized items.
 
-Perfect for displaying cards or widgets in multiple columns with efficient vertical **or horizontal** scrolling.
+## ✨ Features
 
-## 🚀 Quick Example
-
-```dart
-// Fixed-size version (better performance, no layout jumps)
-// Now with scrollDirection: Axis.horizontal for horizontal grids!
-LazyWrap.fixed(
-  itemCount: items.length,
-  estimatedItemWidth: 120,
-  estimatedItemHeight: 100,
-  itemBuilder: (context, index) => ProductCard(item: items[index]),
-  spacing: 8,
-  runSpacing: 8,
-  padding: EdgeInsets.all(12),
-  scrollDirection: Axis.vertical,   // or Axis.horizontal
-)
-
-// Dynamic-size version (auto-measures height, good for complex UIs)
-LazyWrap.dynamic(
-  itemCount: items.length,
-  itemBuilder: (context, index) => ProductCard(item: items[index]),
-  spacing: 8,
-  runSpacing: 8,
-  padding: EdgeInsets.all(12),
-  batchSize: 500,
-  scrollDirection: Axis.horizontal, // horizontal example
-)
-```
-
-## 🎯 Features
-
-- Lazy scroll (only renders visible items)
-- Wrap-style layout with efficient memory usage
-- Responsive to available width
-- Customizable spacing, padding, and alignment
-- Supports both fixed and dynamic size measurement
-- **Supports both vertical and horizontal scroll direction**
-- Clean animation and styling ready
+| Feature | Fixed Mode | Dynamic Mode |
+|---------|------------|--------------|
+| Lazy rendering | ✅ | ✅ |
+| Zero layout jumps | ✅ | ✅ (Offstage measurement) |
+| Horizontal scroll | ✅ | ✅ |
+| Fade-in animation | ❌ | ✅ |
+| Custom loading indicator | ❌ | ✅ |
 
 ## 📦 Installation
 
-Add it to your `pubspec.yaml`:
-
 ```yaml
 dependencies:
-  lazy_wrap: ^0.1.1
+  lazy_wrap: ^1.0.0
 ```
 
-## 🛠 Usage Tip
+## 🚀 Usage
 
-Use `LazyWrap.fixed` to eliminate layout jumps and maximize performance.
+### Fixed Mode (Best Performance)
 
-For widgets with highly variable size, use `LazyWrap.dynamic` and optionally apply chunked rendering or resize smoothing techniques.
+Use when all items have the **same size**:
 
-## 🌀 Example
+```dart
+LazyWrap.fixed(
+  itemCount: 10000,
+  estimatedItemWidth: 120,
+  estimatedItemHeight: 100,
+  itemBuilder: (context, index) => ProductCard(index),
+  spacing: 8,
+  runSpacing: 8,
+)
+```
+
+### Dynamic Mode (Variable Sizes)
+
+Use when items have **different sizes**:
+
+```dart
+LazyWrap.dynamic(
+  itemCount: 10000,
+  itemBuilder: (context, index) => VariableCard(index),
+  spacing: 8,
+  runSpacing: 8,
+  
+  // Optional customization
+  fadeInItems: true,                    // Smooth fade-in animation
+  fadeInDuration: Duration(ms: 200),
+  batchSize: 50,                        // Items per batch
+  loadingBuilder: (ctx) => MyLoader(),  // Custom loading indicator
+)
+```
+
+## 🎯 When to Use Which
+
+| Scenario | Recommended |
+|----------|-------------|
+| Grid of cards (same size) | `LazyWrap.fixed` |
+| Tags/chips (variable width) | `LazyWrap.dynamic` |
+| Mixed content | `LazyWrap.dynamic` |
+| Maximum performance | `LazyWrap.fixed` |
+
+## 🌀 Demo
 
 ![LazyWrap Demo](https://github.com/Hensell/lazy_wrap_demo/raw/101d2a777d64b8ef283dee3c62da374d80cab835/screenshots/1.gif)
 
-### 💻 Live Demo
+👉 [**Live Demo**](https://lazy-wrap-demo.pages.dev/)
 
-Check it out in action:  
-👉 [**lazy-wrap-demo.pages.dev**](https://lazy-wrap-demo.pages.dev/)
+## 📋 API Reference
 
-## 💡 Inspired by
+### Common Parameters
 
-This package was built to fill the gap between `Wrap` layout and `ListView.builder` efficiency.
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `itemCount` | `int` | required | Total number of items |
+| `itemBuilder` | `Widget Function(BuildContext, int)` | required | Builds each item |
+| `spacing` | `double` | `8` | Horizontal space between items |
+| `runSpacing` | `double` | `8` | Vertical space between rows |
+| `padding` | `EdgeInsets` | `zero` | Padding around content |
+| `scrollDirection` | `Axis` | `vertical` | Scroll direction |
+| `cacheExtent` | `double` | `300` | Pre-render buffer in pixels |
 
-## ☕ Support & Donate
+### Fixed Mode Only
 
-If this package helps you or your business, consider buying me a coffee!
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `estimatedItemWidth` | `double` | required | Width of each item |
+| `estimatedItemHeight` | `double` | required | Height of each item |
+
+### Dynamic Mode Only
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `batchSize` | `int` | `50` | Items loaded per batch |
+| `fadeInItems` | `bool` | `true` | Enable fade-in animation |
+| `fadeInDuration` | `Duration` | `200ms` | Fade animation duration |
+| `loadingBuilder` | `Widget Function(BuildContext)?` | `null` | Custom loading indicator |
+
+## ☕ Support
+
+If this package helps you, consider supporting:
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/hensell)
 
+## 📣 Author
 
-## 📣 Maintainer
-
-Hey, I'm Hensell.  
-Check out my [GitHub profile](https://github.com/Hensell) or visit [hensell.dev](https://hensell.dev) for more projects and updates.
-
+Created by [Hensell](https://hensell.dev) • [GitHub](https://github.com/Hensell)
 
 ## Contributors
 
