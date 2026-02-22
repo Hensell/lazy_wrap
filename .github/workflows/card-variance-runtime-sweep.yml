@@ -1,0 +1,118 @@
+name: Card Variance Runtime Sweep
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "Measured runs per preset"
+        required: false
+        default: "7"
+        type: choice
+        options:
+          - "5"
+          - "7"
+          - "10"
+      warmup_runs:
+        description: "Warmup runs per preset"
+        required: false
+        default: "2"
+        type: choice
+        options:
+          - "1"
+          - "2"
+      scenario:
+        description: "Benchmark scenario"
+        required: false
+        default: "dynamic_card_50k"
+        type: choice
+        options:
+          - "dynamic_card_50k"
+      max_jank_cv:
+        description: "CV threshold percent"
+        required: false
+        default: "30"
+        type: choice
+        options:
+          - "20"
+          - "30"
+          - "40"
+      max_jank_mad:
+        description: "MAD/median threshold percent"
+        required: false
+        default: "30"
+        type: choice
+        options:
+          - "20"
+          - "30"
+          - "40"
+      stable_scroll_profile:
+        description: "Use stable deterministic scroll profile"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      runtime_presets:
+        description: "Comma-separated runtime preset ids (empty = all presets)"
+        required: false
+        default: ""
+        type: string
+      enforce_at_least_one_pass:
+        description: "Fail workflow if no preset passes both CV and MAD"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  card-variance-runtime-sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      BENCH_SCENARIO: ${{ inputs.scenario }}
+      BENCH_DEVICE: linux
+      BENCH_REPEATS: ${{ inputs.repeats }}
+      BENCH_WARMUP_RUNS: ${{ inputs.warmup_runs }}
+      MAX_JANK_CV: ${{ inputs.max_jank_cv }}
+      MAX_JANK_MAD: ${{ inputs.max_jank_mad }}
+      BENCH_STABLE_SCROLL_PROFILE: ${{ inputs.stable_scroll_profile }}
+      RUNTIME_PRESETS: ${{ inputs.runtime_presets }}
+      ENFORCE_AT_LEAST_ONE_PASS: ${{ inputs.enforce_at_least_one_pass }}
+      CI_OUT_DIR: benchmarks/results/ci/${{ github.run_id }}/card_variance_runtime_sweep
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb jq python3
+
+      - name: Install Dart/Flutter dependencies
+        run: flutter pub get
+
+      - name: Run card variance runtime sweep CI script
+        run: |
+          chmod +x benchmarks/ci/run_card_variance_runtime_sweep_ci.sh
+          xvfb-run -a benchmarks/ci/run_card_variance_runtime_sweep_ci.sh
+
+      - name: Upload runtime sweep artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: card-variance-runtime-sweep-${{ github.run_id }}
+          path: |
+            benchmarks/results/ci/${{ github.run_id }}/card_variance_runtime_sweep/
+          if-no-files-found: warn

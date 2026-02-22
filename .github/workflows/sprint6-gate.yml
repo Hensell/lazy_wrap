@@ -1,0 +1,85 @@
+name: Sprint6 Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      enforce_go:
+        description: "Fail workflow when gate decision is NO-GO"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      repeats:
+        description: "Benchmark repeats per scenario"
+        required: false
+        default: "3"
+        type: choice
+        options:
+          - "3"
+          - "5"
+      warmup_runs:
+        description: "Warmup runs discarded per scenario"
+        required: false
+        default: "1"
+        type: choice
+        options:
+          - "1"
+          - "2"
+      min_repeats:
+        description: "Minimum repeats required by gate quality check"
+        required: false
+        default: "3"
+        type: choice
+        options:
+          - "3"
+          - "5"
+
+jobs:
+  sprint6-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      BASELINE_SUMMARY: benchmarks/results/20260211_232622Z/summary.json
+      BENCH_DEVICE: linux
+      BENCH_REPEATS: ${{ inputs.repeats }}
+      BENCH_WARMUP_RUNS: ${{ inputs.warmup_runs }}
+      BENCH_MIN_REPEATS: ${{ inputs.min_repeats }}
+      ENFORCE_GO: ${{ inputs.enforce_go }}
+      CI_OUT_DIR: benchmarks/results/ci/${{ github.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb jq
+
+      - name: Install Dart/Flutter dependencies
+        run: flutter pub get
+
+      - name: Run Sprint 6 gate CI script
+        run: |
+          chmod +x benchmarks/ci/run_sprint6_gate_ci.sh
+          xvfb-run -a benchmarks/ci/run_sprint6_gate_ci.sh
+
+      - name: Upload Sprint 6 artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint6-gate-${{ github.run_id }}
+          path: |
+            benchmarks/results/ci/${{ github.run_id }}/
+          if-no-files-found: warn
+

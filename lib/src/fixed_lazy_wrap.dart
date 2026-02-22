@@ -18,10 +18,10 @@ class FixedLazyWrap extends StatefulWidget {
     this.rowAlignment = MainAxisAlignment.start,
     this.scrollDirection = Axis.vertical,
     this.cacheExtent = 300,
-  })  : assert(itemCount >= 0, 'itemCount must be >= 0'),
-        assert(estimatedItemWidth > 0, 'estimatedItemWidth must be > 0'),
-        assert(estimatedItemHeight > 0, 'estimatedItemHeight must be > 0'),
-        assert(cacheExtent >= 0, 'cacheExtent must be >= 0');
+  }) : assert(itemCount >= 0, 'itemCount must be >= 0'),
+       assert(estimatedItemWidth > 0, 'estimatedItemWidth must be > 0'),
+       assert(estimatedItemHeight > 0, 'estimatedItemHeight must be > 0'),
+       assert(cacheExtent >= 0, 'cacheExtent must be >= 0');
 
   /// The total number of items to display.
   final int itemCount;
@@ -88,8 +88,9 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
   void _updateItemsPerGroup(double availableMain, bool isVertical) {
     if (_lastAvailableMain == availableMain) return;
     _lastAvailableMain = availableMain;
-    final itemMain =
-        isVertical ? widget.estimatedItemWidth : widget.estimatedItemHeight;
+    final itemMain = isVertical
+        ? widget.estimatedItemWidth
+        : widget.estimatedItemHeight;
     final spacing = widget.spacing;
     _itemsPerGroup = max(
       1,
@@ -115,14 +116,18 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
 
   @override
   Widget build(BuildContext context) {
+    final textDirection = Directionality.of(context);
+
     return LayoutBuilder(
       builder: (_, constraints) {
         final isVertical = widget.scrollDirection == Axis.vertical;
+        final resolvedPadding = widget.padding.resolve(textDirection);
         final availableMain = isVertical
-            ? constraints.maxWidth - widget.padding.horizontal
-            : constraints.maxHeight - widget.padding.vertical;
-        final availableCross =
-            isVertical ? constraints.maxHeight : constraints.maxWidth;
+            ? constraints.maxWidth - resolvedPadding.horizontal
+            : constraints.maxHeight - resolvedPadding.vertical;
+        final availableCross = isVertical
+            ? constraints.maxHeight
+            : constraints.maxWidth;
 
         _viewportSize = availableCross;
         _updateItemsPerGroup(availableMain, isVertical);
@@ -132,8 +137,10 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
         final estGroupSize = isVertical
             ? widget.estimatedItemHeight + widget.runSpacing
             : widget.estimatedItemWidth + widget.runSpacing;
-        final mainAxisExtent =
-            max(0, groupCount * estGroupSize - widget.runSpacing).toDouble();
+        final mainAxisExtent = max(
+          0,
+          groupCount * estGroupSize - widget.runSpacing,
+        ).toDouble();
 
         // Schedule scroll fix if extent changed
         if (_lastMainAxisExtent != mainAxisExtent) {
@@ -153,6 +160,7 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
                 scrollOffset: scrollOffset,
                 isVertical: isVertical,
                 availableMain: availableMain,
+                resolvedPadding: resolvedPadding,
                 estGroupSize: estGroupSize,
                 mainAxisExtent: mainAxisExtent,
               );
@@ -168,6 +176,7 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
     required double scrollOffset,
     required bool isVertical,
     required double availableMain,
+    required EdgeInsets resolvedPadding,
     required double estGroupSize,
     required double mainAxisExtent,
   }) {
@@ -180,11 +189,12 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
     var currentIndex = estStartGroup * _itemsPerGroup;
     var mainOffset = estStartGroup * estGroupSize;
 
-    final groupSize =
-        isVertical ? widget.estimatedItemHeight : widget.estimatedItemWidth;
+    final groupSize = isVertical
+        ? widget.estimatedItemHeight
+        : widget.estimatedItemWidth;
     final groupCrossStart = isVertical
-        ? widget.padding.resolve(TextDirection.ltr).left
-        : widget.padding.resolve(TextDirection.ltr).top;
+        ? resolvedPadding.left
+        : resolvedPadding.top;
 
     while (currentIndex < widget.itemCount) {
       final groupItems = <Widget>[];
@@ -193,7 +203,8 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
       // Build items for this group
       while (added < _itemsPerGroup && currentIndex < widget.itemCount) {
         final itemIndex = currentIndex;
-        final isLastInGroup = (added == _itemsPerGroup - 1) ||
+        final isLastInGroup =
+            (added == _itemsPerGroup - 1) ||
             (currentIndex == widget.itemCount - 1);
 
         groupItems.add(
@@ -201,8 +212,8 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
             padding: isLastInGroup
                 ? EdgeInsets.zero
                 : (isVertical
-                    ? EdgeInsets.only(right: widget.spacing)
-                    : EdgeInsets.only(bottom: widget.spacing)),
+                      ? EdgeInsets.only(right: widget.spacing)
+                      : EdgeInsets.only(bottom: widget.spacing)),
             child: SizedBox(
               width: widget.estimatedItemWidth,
               height: widget.estimatedItemHeight,
@@ -218,7 +229,8 @@ class _FixedLazyWrapState extends State<FixedLazyWrap> {
       final groupMainEnd = mainOffset + groupSize;
 
       // Only render if visible within buffer
-      final shouldRender = groupMainEnd >= scrollOffset - buffer &&
+      final shouldRender =
+          groupMainEnd >= scrollOffset - buffer &&
           groupMainStart <= scrollOffset + _viewportSize + buffer;
 
       if (shouldRender) {
