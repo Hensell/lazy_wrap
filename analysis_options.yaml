@@ -1,6 +1,12 @@
 analyzer:
   errors:
     lines_longer_than_80_chars: ignore
+    cascade_invocations: ignore
+    public_member_api_docs: ignore
+    avoid_redundant_argument_values: ignore
+    prefer_function_declarations_over_variables: ignore
+    prefer_foreach: ignore
+    omit_local_variable_types: ignore
 include: package:very_good_analysis/analysis_options.yaml
 
 # Additional information about this file can be found at

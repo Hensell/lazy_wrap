@@ -1,0 +1,192 @@
+name: Card Variance Consecutive
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "Measured runs per variance batch"
+        required: false
+        default: "7"
+        type: choice
+        options:
+          - "7"
+          - "10"
+      warmup_runs:
+        description: "Warmup runs discarded before each batch"
+        required: false
+        default: "2"
+        type: choice
+        options:
+          - "1"
+          - "2"
+      min_repeats:
+        description: "Minimum repeats required per batch"
+        required: false
+        default: "7"
+        type: choice
+        options:
+          - "5"
+          - "7"
+      stable_scroll_profile:
+        description: "Use stable deterministic scroll profile"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      scroll_input_mode:
+        description: "Scroll input mode used by benchmark runner"
+        required: false
+        default: "jump"
+        type: choice
+        options:
+          - "jump"
+          - "drag"
+      scroll_jump_profile:
+        description: "Jump target profile used when scroll_input_mode=jump"
+        required: false
+        default: "edge_bounce"
+        type: choice
+        options:
+          - "edge_bounce"
+          - "relative"
+      scroll_step_px:
+        description: "Per-step scroll delta in px used by benchmark runner"
+        required: false
+        default: "-280"
+        type: choice
+        options:
+          - "-240"
+          - "-260"
+          - "-280"
+          - "-300"
+          - "-320"
+      decision_mode:
+        description: "Consecutive decision mode"
+        required: false
+        default: "cv_and_mad"
+        type: choice
+        options:
+          - "cv_and_mad"
+          - "cv_or_mad"
+          - "cv"
+          - "mad"
+      cv_threshold:
+        description: "CV threshold percent used by consecutive check"
+        required: false
+        default: "30"
+        type: choice
+        options:
+          - "20"
+          - "30"
+          - "40"
+      mad_threshold:
+        description: "MAD threshold percent used by consecutive check"
+        required: false
+        default: "30"
+        type: choice
+        options:
+          - "20"
+          - "30"
+          - "40"
+      max_jank_cv:
+        description: "Soft CV gate for each batch run"
+        required: false
+        default: "70"
+        type: choice
+        options:
+          - "60"
+          - "70"
+          - "80"
+      max_jank_mad:
+        description: "Soft MAD gate for each batch run"
+        required: false
+        default: "30"
+        type: choice
+        options:
+          - "20"
+          - "30"
+          - "40"
+      enforce_max_jank_cv:
+        description: "Enforce CV gate inside each batch run"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      enforce_max_jank_mad:
+        description: "Enforce MAD gate inside each batch run"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      enforce_consecutive_pass:
+        description: "Fail workflow when consecutive decision is FAIL"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+jobs:
+  card-variance-consecutive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      BENCH_SCENARIO: dynamic_card_50k
+      BENCH_DEVICE: linux
+      BENCH_REPEATS: ${{ inputs.repeats }}
+      BENCH_WARMUP_RUNS: ${{ inputs.warmup_runs }}
+      BENCH_MIN_REPEATS: ${{ inputs.min_repeats }}
+      BENCH_STABLE_SCROLL_PROFILE: ${{ inputs.stable_scroll_profile }}
+      BENCH_SCROLL_INPUT_MODE: ${{ inputs.scroll_input_mode }}
+      BENCH_SCROLL_JUMP_PROFILE: ${{ inputs.scroll_jump_profile }}
+      BENCH_SCROLL_STEP_PX: ${{ inputs.scroll_step_px }}
+      MAX_JANK_CV: ${{ inputs.max_jank_cv }}
+      MAX_JANK_MAD: ${{ inputs.max_jank_mad }}
+      ENFORCE_MAX_JANK_CV: ${{ inputs.enforce_max_jank_cv }}
+      ENFORCE_MAX_JANK_MAD: ${{ inputs.enforce_max_jank_mad }}
+      DECISION_MODE: ${{ inputs.decision_mode }}
+      CV_THRESHOLD: ${{ inputs.cv_threshold }}
+      MAD_THRESHOLD: ${{ inputs.mad_threshold }}
+      ENFORCE_CONSECUTIVE_PASS: ${{ inputs.enforce_consecutive_pass }}
+      CI_OUT_DIR: benchmarks/results/ci/${{ github.run_id }}/card_variance_consecutive
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb jq python3
+
+      - name: Install Dart/Flutter dependencies
+        run: flutter pub get
+
+      - name: Run card variance consecutive CI script
+        run: |
+          chmod +x benchmarks/ci/run_card_variance_consecutive_ci.sh
+          xvfb-run -a benchmarks/ci/run_card_variance_consecutive_ci.sh
+
+      - name: Upload card variance consecutive artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: card-variance-consecutive-${{ github.run_id }}
+          path: |
+            benchmarks/results/ci/${{ github.run_id }}/card_variance_consecutive/
+          if-no-files-found: warn

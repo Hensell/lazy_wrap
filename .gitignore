@@ -29,3 +29,14 @@ migrate_working_dir/
 .flutter-plugins
 .flutter-plugins-dependencies
 build/
+
+# Benchmark runtime outputs (generated locally; keep the folder scaffold)
+benchmarks/results/*
+!benchmarks/results/.gitkeep
+
+# Benchmark generated reports/summaries at benchmarks/ root (keep scripts/docs)
+benchmarks/baseline_report.md
+benchmarks/*_report.md
+benchmarks/*_report.json
+benchmarks/*_summary.md
+benchmarks/*_summary.json

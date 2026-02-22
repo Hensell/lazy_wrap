@@ -1,0 +1,8 @@
+# Internal planning and benchmark artifacts are not part of the published package.
+benchmarks/
+docs/
+TECHO_TECNICO_ROADMAP.md
+SLIVER_V3_SPIKE_PLAN.md
+.github/
+build/
+*.iml
