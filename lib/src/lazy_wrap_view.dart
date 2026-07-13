@@ -49,6 +49,8 @@ class LazyWrap extends StatelessWidget {
     this.itemHeightBuilder,
   }) : isDynamic = true,
        assert(itemCount >= 0, 'itemCount must be >= 0'),
+       assert(spacing >= 0, 'spacing must be >= 0'),
+       assert(runSpacing >= 0, 'runSpacing must be >= 0'),
        assert(batchSize == null || batchSize > 0, 'batchSize must be > 0'),
        assert(
          measureBatchSize == null || measureBatchSize > 0,

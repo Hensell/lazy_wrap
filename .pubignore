@@ -6,3 +6,8 @@ SLIVER_V3_SPIKE_PLAN.md
 .github/
 build/
 *.iml
+
+# Development-only validation and internal spikes.
+test/
+integration_test/
+lib/src/dynamic_lazy_wrap_sliver_v3.dart

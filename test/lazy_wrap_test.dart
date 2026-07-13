@@ -171,6 +171,28 @@ void main() {
       );
     });
 
+    test('asserts when spacing is negative', () {
+      expect(
+        () => LazyWrap.dynamic(
+          itemCount: 1,
+          spacing: -1,
+          itemBuilder: _testItemBuilder,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
+    test('asserts when runSpacing is negative', () {
+      expect(
+        () => LazyWrap.dynamic(
+          itemCount: 1,
+          runSpacing: -1,
+          itemBuilder: _testItemBuilder,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
     test('asserts when batchSize is not positive', () {
       expect(
         () => LazyWrap.dynamic(
@@ -693,6 +715,25 @@ void main() {
   });
 
   group('DynamicLazyWrap', () {
+    test('asserts when spacing or runSpacing is negative', () {
+      expect(
+        () => DynamicLazyWrap(
+          itemCount: 1,
+          spacing: -1,
+          itemBuilder: _testItemBuilder,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+      expect(
+        () => DynamicLazyWrap(
+          itemCount: 1,
+          runSpacing: -1,
+          itemBuilder: _testItemBuilder,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
+    });
+
     test('asserts when sliverV2 is selected without size builders', () {
       expect(
         () => DynamicLazyWrap(
@@ -998,6 +1039,7 @@ void main() {
       }
 
       expect(tester.takeException(), isNull);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
     });
   });
 }

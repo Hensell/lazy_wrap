@@ -19,8 +19,8 @@ class SliverV3RowLayout {
     return SliverV3RowLayout._(
       rowStarts: Int32List(0),
       rowLengths: Int32List(0),
-      rowCrossExtents: Float32List(0),
-      rowScrollOffsets: Float32List(0),
+      rowCrossExtents: Float64List(0),
+      rowScrollOffsets: Float64List(0),
       totalScrollExtent: 0,
     );
   }
@@ -36,6 +36,9 @@ class SliverV3RowLayout {
     required double Function(int index) itemWidth,
     required double Function(int index) itemHeight,
   }) {
+    assert(spacing >= 0, 'spacing must be >= 0');
+    assert(runSpacing >= 0, 'runSpacing must be >= 0');
+
     if (itemCount <= 0 || availableMainAxisExtent <= 0) {
       return SliverV3RowLayout.empty();
     }
@@ -91,8 +94,8 @@ class SliverV3RowLayout {
     return SliverV3RowLayout._(
       rowStarts: Int32List.fromList(starts),
       rowLengths: Int32List.fromList(lengths),
-      rowCrossExtents: Float32List.fromList(crossExtents),
-      rowScrollOffsets: Float32List.fromList(scrollOffsets),
+      rowCrossExtents: Float64List.fromList(crossExtents),
+      rowScrollOffsets: Float64List.fromList(scrollOffsets),
       totalScrollExtent: totalScrollExtent,
     );
   }
@@ -104,10 +107,10 @@ class SliverV3RowLayout {
   final Int32List rowLengths;
 
   /// Cross-axis extent (row height for vertical scrolling) of each row.
-  final Float32List rowCrossExtents;
+  final Float64List rowCrossExtents;
 
   /// Scroll offset (main axis) where each row starts.
-  final Float32List rowScrollOffsets;
+  final Float64List rowScrollOffsets;
 
   /// Full scroll extent of the packed content.
   final double totalScrollExtent;
@@ -201,9 +204,7 @@ class SliverV3RowWindow {
   });
 
   /// Empty row window.
-  const SliverV3RowWindow.empty()
-      : startRow = 0,
-        endRowExclusive = 0;
+  const SliverV3RowWindow.empty() : startRow = 0, endRowExclusive = 0;
 
   /// First visible row index (inclusive).
   final int startRow;

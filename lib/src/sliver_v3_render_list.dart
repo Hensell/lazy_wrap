@@ -55,7 +55,6 @@ class RenderSliverV3RenderList extends RenderSliverMultiBoxAdaptor {
   }
 
   double _rowStart(int index) => _rows.rowScrollOffsets[index];
-  double _rowEnd(int index) => _rowStart(index) + _rows.rowCrossExtents[index];
 
   @override
   void performLayout() {
@@ -93,6 +92,16 @@ class RenderSliverV3RenderList extends RenderSliverMultiBoxAdaptor {
       final totalExtent = _rows.totalScrollExtent;
       geometry = SliverGeometry(
         scrollExtent: totalExtent,
+        paintExtent: calculatePaintOffset(
+          constraints,
+          from: 0,
+          to: totalExtent,
+        ),
+        cacheExtent: calculateCacheOffset(
+          constraints,
+          from: 0,
+          to: totalExtent,
+        ),
         maxPaintExtent: totalExtent,
         hasVisualOverflow: constraints.scrollOffset > 0,
       );
@@ -121,6 +130,16 @@ class RenderSliverV3RenderList extends RenderSliverMultiBoxAdaptor {
         final totalExtent = _rows.totalScrollExtent;
         geometry = SliverGeometry(
           scrollExtent: totalExtent,
+          paintExtent: calculatePaintOffset(
+            constraints,
+            from: 0,
+            to: totalExtent,
+          ),
+          cacheExtent: calculateCacheOffset(
+            constraints,
+            from: 0,
+            to: totalExtent,
+          ),
           maxPaintExtent: totalExtent,
         );
         childManager.didFinishLayout();
@@ -180,19 +199,20 @@ class RenderSliverV3RenderList extends RenderSliverMultiBoxAdaptor {
     }
 
     final lastIndex = indexOf(lastChild!);
-    final leadingScrollOffset = _rowStart(firstIndex);
-    final trailingScrollOffset = _rowEnd(lastIndex);
     final estimatedMaxScrollOffset = _rows.totalScrollExtent;
 
+    // The logical sliver includes run-spacing gaps, not just the laid-out row
+    // boxes. Consuming the full interval keeps following slivers from painting
+    // inside a gap when the viewport or cache boundary lands between rows.
     final paintExtent = calculatePaintOffset(
       constraints,
-      from: leadingScrollOffset,
-      to: trailingScrollOffset,
+      from: 0,
+      to: estimatedMaxScrollOffset,
     );
     final cacheExtent = calculateCacheOffset(
       constraints,
-      from: leadingScrollOffset,
-      to: trailingScrollOffset,
+      from: 0,
+      to: estimatedMaxScrollOffset,
     );
 
     geometry = SliverGeometry(

@@ -1,5 +1,33 @@
 ## [Unreleased]
 
+### Added
+- Added rapid-scroll regression coverage for measurement progress, edge
+  bouncing, fade re-entry, row-spacing gaps, and large scroll offsets.
+- Added an extreme validation scenario with 200,000 variable-size items,
+  complete last-to-first traversal, and repeated edge jumps.
+- Rebuilt the example as an interactive fixed/dynamic test lab with presets up
+  to 200,000 items and manual rapid-scroll controls.
+
+### Changed
+- Dynamic mode now uses exact precomputed row geometry instead of estimated
+  variable-row offsets, making large jumps and rapid reversals deterministic.
+- Row offsets and extents now use 64-bit precision for very large scroll areas.
+- Internal benchmarks, planning documents, development tests, and experimental
+  spike sources are excluded from the pub.dev archive.
+- Refreshed the README around the public fixed and dynamic APIs.
+
+### Fixed
+- Prevented dynamic Offstage measurement from stalling when consecutive
+  sub-batches contain items with identical sizes.
+- Added strict measurement backpressure so rapid edge scrolling cannot enqueue
+  multiple unmeasured load batches and starve the UI thread.
+- Removed the artificial load delay and made static custom loading indicators
+  advance the measurement pipeline without requiring additional user input.
+- Made one-time fade-ins resilient to row recycling and skipped transparent
+  transitions during high-velocity scrolling, preventing gray/blank flashes.
+- Kept loading state consistent when `itemCount` shrinks during pending work.
+- Prevented following slivers from painting inside `runSpacing` gaps.
+
 ---
 
 ## [1.1.0]

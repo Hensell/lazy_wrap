@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lazy_wrap/src/sliver_v3_layout_core.dart';
 
@@ -67,6 +69,41 @@ void main() {
       expect(emptyByCount.totalScrollExtent, 0);
       expect(emptyByMainAxis.rowCount, 0);
       expect(emptyByMainAxis.totalScrollExtent, 0);
+    });
+
+    test('preserves sub-pixel precision beyond the Float32 range', () {
+      const itemCount = 20000;
+      const itemExtent = 1000.25;
+      final layout = SliverV3RowLayout.compute(
+        itemCount: itemCount,
+        availableMainAxisExtent: 1,
+        spacing: 0,
+        runSpacing: 0,
+        itemWidth: (_) => 1,
+        itemHeight: (_) => itemExtent,
+      );
+
+      expect(layout.rowCrossExtents, isA<Float64List>());
+      expect(layout.rowScrollOffsets, isA<Float64List>());
+      expect(
+        layout.rowScrollOffsets.last,
+        (itemCount - 1) * itemExtent,
+      );
+      expect(layout.totalScrollExtent, itemCount * itemExtent);
+    });
+
+    test('asserts when spacing is negative', () {
+      expect(
+        () => SliverV3RowLayout.compute(
+          itemCount: 1,
+          availableMainAxisExtent: 100,
+          spacing: -1,
+          runSpacing: 0,
+          itemWidth: (_) => 10,
+          itemHeight: (_) => 10,
+        ),
+        throwsA(isA<AssertionError>()),
+      );
     });
   });
 

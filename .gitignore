@@ -10,6 +10,10 @@
 .svn/
 migrate_working_dir/
 
+# Local AI/agent workspace metadata
+.agents/
+.codex/
+
 # IntelliJ related
 *.iml
 *.ipr

@@ -2,6 +2,25 @@
 
 Este directorio contiene el harness de benchmarks para Sprint 1.
 
+## Stress extremo de `LazyWrap.dynamic`
+
+Recorre todos los lotes, verifica que el ultimo item sea realmente visible,
+regresa al primero y ejecuta rebotes completos sin frames transparentes. El
+conteo por defecto es `200000`:
+
+```bash
+flutter test --no-pub benchmarks/dynamic_extreme_scroll_test.dart
+```
+
+Para una escala distinta:
+
+```bash
+flutter test --no-pub \
+  --dart-define=EXTREME_ITEM_COUNT=20000 \
+  --dart-define=EXTREME_BATCH_SIZE=2000 \
+  benchmarks/dynamic_extreme_scroll_test.dart
+```
+
 ## Comando unico
 
 ```bash

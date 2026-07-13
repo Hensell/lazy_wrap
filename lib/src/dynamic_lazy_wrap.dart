@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:lazy_wrap/src/dynamic_lazy_wrap_sliver_v2.dart';
 import 'package:lazy_wrap/src/lazy_wrap_engine.dart';
 import 'package:lazy_wrap/src/offstage_visible_cache_policy.dart';
+import 'package:lazy_wrap/src/sliver_v3_layout_core.dart';
+import 'package:lazy_wrap/src/sliver_v3_render_list.dart';
 
 const _offstageAddAutomaticKeepAlives = bool.fromEnvironment(
   'OFFSTAGE_ADD_AUTOMATIC_KEEP_ALIVES',
@@ -64,10 +66,13 @@ const _offstageMeasurementFlushChunkSize = int.fromEnvironment(
 /// Internal widget that measures its child's size after layout.
 class _MeasureSize extends StatefulWidget {
   const _MeasureSize({
+    required this.measurementId,
     required this.child,
     required this.onChange,
+    super.key,
   });
 
+  final int measurementId;
   final Widget child;
   final void Function(Size size) onChange;
 
@@ -78,6 +83,14 @@ class _MeasureSize extends StatefulWidget {
 class _MeasureSizeState extends State<_MeasureSize> {
   Size? _lastSize;
   bool _scheduled = false;
+
+  @override
+  void didUpdateWidget(covariant _MeasureSize oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.measurementId != widget.measurementId) {
+      _lastSize = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,17 +130,16 @@ Widget _defaultLoadingBuilder(BuildContext context) {
 class _RowsLayout {
   _RowsLayout({
     required this.itemIndices,
-    required this.rowStarts,
-    required this.rowLengths,
-    required this.rowCrossExtents,
+    required this.geometry,
   });
 
   final Int32List itemIndices;
-  final Int32List rowStarts;
-  final Int32List rowLengths;
-  final Float32List rowCrossExtents;
+  final SliverV3RowLayout geometry;
 
-  int get rowCount => rowStarts.length;
+  Int32List get rowStarts => geometry.rowStarts;
+  Int32List get rowLengths => geometry.rowLengths;
+  Float64List get rowCrossExtents => geometry.rowCrossExtents;
+  int get rowCount => geometry.rowCount;
 }
 
 /// A lazy wrap layout for items of dynamic/unknown size.
@@ -178,6 +190,8 @@ class DynamicLazyWrap extends StatelessWidget {
     this.itemWidthBuilder,
     this.itemHeightBuilder,
   }) : assert(itemCount >= 0, 'itemCount must be >= 0'),
+       assert(spacing >= 0, 'spacing must be >= 0'),
+       assert(runSpacing >= 0, 'runSpacing must be >= 0'),
        assert(batchSize > 0, 'batchSize must be > 0'),
        assert(measureBatchSize > 0, 'measureBatchSize must be > 0'),
        assert(cacheExtent >= 0, 'cacheExtent must be >= 0'),
@@ -358,8 +372,15 @@ class _DynamicLazyWrapOffstageV1State
   /// Newly measured sizes buffered until the next flush frame.
   final Map<int, Size> _pendingMeasuredSizes = {};
 
-  /// Items that have already been animated (fade-in completed).
+  /// Items whose one-time fade has already been consumed.
   Uint8List _animatedItems = Uint8List(0);
+
+  /// Items whose first fade is currently mounted.
+  ///
+  /// This is separate from [_animatedItems] so rebuilding the sliver while a
+  /// fade is running does not remove and restart the transition. If the row is
+  /// recycled before completion, [_FadeInWidget] consumes the fade on dispose.
+  final Set<int> _fadingItems = {};
 
   /// Pending items that need measuring but haven't been sent to Offstage yet.
   final Queue<int> _pendingMeasure = Queue<int>();
@@ -386,9 +407,16 @@ class _DynamicLazyWrapOffstageV1State
   double? _lastAvailableMain;
   bool _measurementFlushScheduled = false;
   bool _fillViewportCheckScheduled = false;
+  bool _skipFadeForCurrentFrame = false;
+  bool _fadePriorityResetScheduled = false;
+  double _lastObservedScrollOffset = 0;
 
   bool get _isVertical => widget.scrollDirection == Axis.vertical;
   bool get _hasMoreItems => _loadedCount < widget.itemCount;
+  bool get _hasMeasurementWork =>
+      _measuringItems.isNotEmpty ||
+      _pendingMeasure.isNotEmpty ||
+      _pendingMeasuredSizes.isNotEmpty;
 
   @override
   void initState() {
@@ -428,6 +456,7 @@ class _DynamicLazyWrapOffstageV1State
       if (!identical(_scrollController, nextController)) {
         _scrollController.removeListener(_onScroll);
         _scrollController = nextController;
+        _lastObservedScrollOffset = 0;
         _scrollController.addListener(_onScroll);
       }
     }
@@ -448,7 +477,24 @@ class _DynamicLazyWrapOffstageV1State
       }
       _rowsCache = null;
       _removeOutOfRangeItems();
+      if (!_offstageIncrementalLoad && !_hasMeasurementWork) {
+        _isLoading = false;
+      }
       _scheduleFillViewportCheck();
+    }
+
+    if (widget.spacing != oldWidget.spacing ||
+        widget.runSpacing != oldWidget.runSpacing ||
+        widget.scrollDirection != oldWidget.scrollDirection) {
+      _rowsCache = null;
+      _lastAvailableMain = null;
+    }
+
+    if (oldWidget.fadeInItems && !widget.fadeInItems) {
+      for (final index in _fadingItems) {
+        _markAnimated(index);
+      }
+      _fadingItems.clear();
     }
 
     if (widget.measureBatchSize != oldWidget.measureBatchSize) {
@@ -468,6 +514,7 @@ class _DynamicLazyWrapOffstageV1State
     _pendingMeasure.removeWhere((i) => i >= itemCount);
     _measuringItems.removeWhere((i) => i >= itemCount);
     _pendingMeasuredSizes.removeWhere((i, _) => i >= itemCount);
+    _fadingItems.removeWhere((i) => i >= itemCount);
     _visibleItemWidgetCache.removeWhere((index, _) => index >= itemCount);
     _trimVisibleItemWidgetCache();
 
@@ -573,10 +620,12 @@ class _DynamicLazyWrapOffstageV1State
   void _scheduleFillViewportCheck() {
     if (_fillViewportCheckScheduled) return;
     _fillViewportCheckScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    final binding = WidgetsBinding.instance;
+    binding.addPostFrameCallback((_) {
       _fillViewportCheckScheduled = false;
       _checkFillViewport();
     });
+    binding.ensureVisualUpdate();
   }
 
   void _checkFillViewport() {
@@ -586,49 +635,61 @@ class _DynamicLazyWrapOffstageV1State
     // Don't load more while items are still being measured.
     // Unmeasured items don't contribute to scrollExtent yet, so
     // loading more before they're measured creates an infinite loop.
-    if (_measuringItems.isNotEmpty ||
-        _pendingMeasure.isNotEmpty ||
-        _pendingMeasuredSizes.isNotEmpty) {
+    if (_hasMeasurementWork) {
       return;
     }
 
     final pos = _scrollController.position;
-    if (pos.maxScrollExtent <= 0 ||
-        pos.maxScrollExtent < pos.viewportDimension) {
+    if (_shouldLoadFor(pos)) {
       _loadMore();
     }
+  }
+
+  bool _shouldLoadFor(ScrollMetrics position) {
+    return position.maxScrollExtent <= 0 ||
+        position.maxScrollExtent < position.viewportDimension ||
+        position.extentAfter <= widget.loadThreshold;
   }
 
   void _onScroll() {
-    if (_isLoading || !_hasMoreItems) return;
+    if (!_scrollController.hasClients) return;
 
     final pos = _scrollController.position;
-    final threshold = pos.maxScrollExtent - widget.loadThreshold;
+    final scrollDelta = (pos.pixels - _lastObservedScrollOffset).abs();
+    _lastObservedScrollOffset = pos.pixels;
+    if (pos.viewportDimension > 0 && scrollDelta > pos.viewportDimension) {
+      _skipFadeForCurrentFrame = true;
+      _scheduleFadePriorityReset();
+    }
 
-    if (pos.pixels >= threshold) {
+    if (_isLoading || !_hasMoreItems || _hasMeasurementWork) return;
+
+    if (_shouldLoadFor(pos)) {
       _loadMore();
     }
   }
 
+  void _scheduleFadePriorityReset() {
+    if (_fadePriorityResetScheduled) return;
+    _fadePriorityResetScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fadePriorityResetScheduled = false;
+      _skipFadeForCurrentFrame = false;
+    });
+  }
+
   void _loadMore() {
-    if (_isLoading || !_hasMoreItems) return;
+    if (_isLoading || !_hasMoreItems || _hasMeasurementWork) return;
     if (!_offstageIncrementalLoad) {
-      setState(() => _isLoading = true);
-
-      Future.delayed(const Duration(milliseconds: 16), () {
-        if (!mounted) return;
-
-        setState(() {
-          _loadedCount = (_loadedCount + widget.batchSize).clamp(
-            0,
-            widget.itemCount,
-          );
-          _ensureItemSizesLength(_loadedCount);
-          _ensureAnimatedLength(_loadedCount);
-          _isLoading = false;
-          _rowsCache = null;
-        });
-        _scheduleFillViewportCheck();
+      setState(() {
+        _isLoading = true;
+        _loadedCount = (_loadedCount + widget.batchSize).clamp(
+          0,
+          widget.itemCount,
+        );
+        _ensureItemSizesLength(_loadedCount);
+        _ensureAnimatedLength(_loadedCount);
+        _rowsCache = null;
       });
       return;
     }
@@ -649,7 +710,7 @@ class _DynamicLazyWrapOffstageV1State
   void _scheduleLoadStep() {
     if (_loadStepScheduled) return;
     _loadStepScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.scheduleFrameCallback((_) {
       _loadStepScheduled = false;
       _runLoadStep();
     });
@@ -667,10 +728,7 @@ class _DynamicLazyWrapOffstageV1State
 
     // Avoid stacking load steps while current items are still being measured.
     // This keeps the queue bounded and prevents runaway frame churn.
-    if (_measuringItems.isNotEmpty ||
-        _pendingMeasure.isNotEmpty ||
-        _pendingMeasuredSizes.isNotEmpty) {
-      _scheduleLoadStep();
+    if (_hasMeasurementWork) {
       return;
     }
 
@@ -690,16 +748,7 @@ class _DynamicLazyWrapOffstageV1State
       _ensureItemSizesLength(_loadedCount);
       _ensureAnimatedLength(_loadedCount);
       _rowsCache = null;
-      if (_pendingLoadCount <= 0) {
-        _isLoading = false;
-      }
     });
-
-    if (_pendingLoadCount > 0) {
-      _scheduleLoadStep();
-    } else {
-      _scheduleFillViewportCheck();
-    }
   }
 
   void _onItemMeasured(int index, Size size) {
@@ -718,7 +767,7 @@ class _DynamicLazyWrapOffstageV1State
     if (_measurementFlushScheduled) return;
     _measurementFlushScheduled = true;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.scheduleFrameCallback((_) {
       _measurementFlushScheduled = false;
       if (!mounted) return;
 
@@ -758,7 +807,14 @@ class _DynamicLazyWrapOffstageV1State
       setState(() {});
       return;
     }
-    if (_pendingMeasure.isEmpty && _measuringItems.isEmpty) {
+    if (!_hasMeasurementWork) {
+      if (_offstageIncrementalLoad && _pendingLoadCount > 0) {
+        _scheduleLoadStep();
+        return;
+      }
+      if (_isLoading) {
+        setState(() => _isLoading = false);
+      }
       _scheduleFillViewportCheck();
     }
   }
@@ -793,53 +849,29 @@ class _DynamicLazyWrapOffstageV1State
     }
 
     final flatIndices = <int>[];
-    final rowStarts = <int>[];
-    final rowLengths = <int>[];
-    final rowCrossExtents = <double>[];
-    var currentRowLength = 0;
-    var currentRowStart = 0;
-    var currentRowMain = 0.0;
-    var currentRowCross = 0.0;
-
     for (var i = 0; i < _loadedCount; i++) {
       if (!_hasMeasuredSize(i)) continue;
-
-      final itemMain = _isVertical ? _itemWidths[i] : _itemHeights[i];
-      final itemCross = _isVertical ? _itemHeights[i] : _itemWidths[i];
-      final neededSpace = currentRowLength == 0
-          ? itemMain
-          : widget.spacing + itemMain;
-
-      if (currentRowMain + neededSpace > availableMain &&
-          currentRowLength > 0) {
-        rowStarts.add(currentRowStart);
-        rowLengths.add(currentRowLength);
-        rowCrossExtents.add(currentRowCross);
-        currentRowStart = flatIndices.length;
-        currentRowLength = 0;
-        currentRowMain = 0;
-        currentRowCross = 0;
-      }
-
       flatIndices.add(i);
-      currentRowMain += currentRowLength == 0
-          ? itemMain
-          : widget.spacing + itemMain;
-      currentRowCross = max(currentRowCross, itemCross);
-      currentRowLength++;
     }
 
-    if (currentRowLength > 0) {
-      rowStarts.add(currentRowStart);
-      rowLengths.add(currentRowLength);
-      rowCrossExtents.add(currentRowCross);
-    }
-
+    final itemIndices = Int32List.fromList(flatIndices);
+    final geometry = SliverV3RowLayout.compute(
+      itemCount: itemIndices.length,
+      availableMainAxisExtent: availableMain,
+      spacing: widget.spacing,
+      runSpacing: widget.runSpacing,
+      itemWidth: (flatIndex) {
+        final itemIndex = itemIndices[flatIndex];
+        return _isVertical ? _itemWidths[itemIndex] : _itemHeights[itemIndex];
+      },
+      itemHeight: (flatIndex) {
+        final itemIndex = itemIndices[flatIndex];
+        return _isVertical ? _itemHeights[itemIndex] : _itemWidths[itemIndex];
+      },
+    );
     final rows = _RowsLayout(
-      itemIndices: Int32List.fromList(flatIndices),
-      rowStarts: Int32List.fromList(rowStarts),
-      rowLengths: Int32List.fromList(rowLengths),
-      rowCrossExtents: Float32List.fromList(rowCrossExtents),
+      itemIndices: itemIndices,
+      geometry: geometry,
     );
     _rowsCache = rows;
     _lastAvailableMain = availableMain;
@@ -884,6 +916,8 @@ class _DynamicLazyWrapOffstageV1State
                 child: Column(
                   children: itemsToMeasure.map((index) {
                     return _MeasureSize(
+                      key: ValueKey<int>(index),
+                      measurementId: index,
                       onChange: (size) => _onItemMeasured(index, size),
                       child: widget.itemBuilder(context, index),
                     );
@@ -899,7 +933,8 @@ class _DynamicLazyWrapOffstageV1State
               slivers: [
                 SliverPadding(
                   padding: widget.padding,
-                  sliver: SliverList(
+                  sliver: SliverV3RenderList(
+                    rows: rows.geometry,
                     delegate: SliverChildBuilderDelegate(
                       (context, rowIndex) {
                         if (rowIndex >= rows.rowCount) return null;
@@ -955,12 +990,32 @@ class _DynamicLazyWrapOffstageV1State
         child: _buildVisibleItem(context, itemIndex),
       );
 
-      // Apply fade-in animation for items not yet animated
+      // A fast fling can create a full viewport of new children in one frame.
+      // Starting all of them at opacity zero looks like a gray/blank screen,
+      // so consume their one-time fade and render them immediately while the
+      // framework recommends deferring expensive visual work.
       if (widget.fadeInItems && !_isAnimated(itemIndex)) {
+        final deferFade =
+            _skipFadeForCurrentFrame ||
+            Scrollable.recommendDeferredLoadingForContext(
+              context,
+              axis: widget.scrollDirection,
+            );
+        if (deferFade) {
+          _markAnimated(itemIndex);
+          _fadingItems.remove(itemIndex);
+        } else {
+          _fadingItems.add(itemIndex);
+        }
+      }
+
+      if (widget.fadeInItems && _fadingItems.contains(itemIndex)) {
         child = _FadeInWidget(
+          key: ValueKey<int>(itemIndex),
           duration: widget.fadeInDuration,
           curve: widget.fadeInCurve,
-          onComplete: () {
+          onFinished: () {
+            _fadingItems.remove(itemIndex);
             _markAnimated(itemIndex);
           },
           child: child,
@@ -991,16 +1046,6 @@ class _DynamicLazyWrapOffstageV1State
       row = SizedBox(
         height: _isVertical ? maxCross : null,
         width: _isVertical ? null : maxCross,
-        child: row,
-      );
-    }
-
-    final isLastRow = rowIndex == rows.rowCount - 1;
-    if (!isLastRow) {
-      row = Padding(
-        padding: _isVertical
-            ? EdgeInsets.only(bottom: widget.runSpacing)
-            : EdgeInsets.only(right: widget.runSpacing),
         child: row,
       );
     }
@@ -1189,13 +1234,14 @@ class _FadeInWidget extends StatefulWidget {
     required this.child,
     required this.duration,
     required this.curve,
-    this.onComplete,
+    this.onFinished,
+    super.key,
   });
 
   final Widget child;
   final Duration duration;
   final Curve curve;
-  final VoidCallback? onComplete;
+  final VoidCallback? onFinished;
 
   @override
   State<_FadeInWidget> createState() => _FadeInWidgetState();
@@ -1205,6 +1251,7 @@ class _FadeInWidgetState extends State<_FadeInWidget>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _opacity;
+  bool _didFinish = false;
 
   @override
   void initState() {
@@ -1217,15 +1264,18 @@ class _FadeInWidgetState extends State<_FadeInWidget>
       parent: _controller,
       curve: widget.curve,
     );
-    unawaited(
-      _controller.forward().then((_) {
-        widget.onComplete?.call();
-      }),
-    );
+    unawaited(_controller.forward().then((_) => _finish()));
+  }
+
+  void _finish() {
+    if (_didFinish) return;
+    _didFinish = true;
+    widget.onFinished?.call();
   }
 
   @override
   void dispose() {
+    _finish();
     _controller.dispose();
     super.dispose();
   }
