@@ -1,4 +1,4 @@
-## [Unreleased]
+## [1.1.1]
 
 ### Added
 - Added rapid-scroll regression coverage for measurement progress, edge
